@@ -2,10 +2,10 @@ import { create } from 'zustand'
 
 const DEFAULT_SETTINGS = {
   remove_bg:   true,
-  n_colores:   0,       // 0 = automático
+  n_colores:   0,
   min_area:    400,
-  gauss_sigma: 1.5,     // suavizado gaussiano
-  delta_e:     12.0,    // fusión capas similares
+  gauss_sigma: 1.5,
+  delta_e:     12.0,
 }
 
 export const useStore = create((set, get) => ({
@@ -17,14 +17,13 @@ export const useStore = create((set, get) => ({
   capas:          [],
   capaActivaId:   null,
 
-  settings:     { ...DEFAULT_SETTINGS },
-  settingsOpen: false,
-
+  settings:      { ...DEFAULT_SETTINGS },
+  settingsOpen:  false,
   cargando:      false,
   errorMsg:      null,
   exportandoPDF: false,
 
-  // ── Acciones ──────────────────────────────────────────────────────────────
+  // ── Acciones básicas ──────────────────────────────────────────────────────
 
   setProyecto: ({ proyectoId, nombre, imagenUrl, ancho, alto, capas }) =>
     set({
@@ -37,19 +36,39 @@ export const useStore = create((set, get) => ({
       errorMsg: null,
     }),
 
-  setCapaActiva:  (id)  => set({ capaActivaId: id }),
-  setSetting:     (k, v) => set((s) => ({ settings: { ...s.settings, [k]: v } })),
-  resetSettings:  ()    => set({ settings: { ...DEFAULT_SETTINGS } }),
-  setCargando:    (v)   => set({ cargando: v }),
-  setExportandoPDF:(v)  => set({ exportandoPDF: v }),
-  setError:       (msg) => set({ errorMsg: msg }),
-  setSettingsOpen:(v)   => set({ settingsOpen: v }),
+  setCapaActiva:   (id)   => set({ capaActivaId: id }),
+  setSetting:      (k, v) => set((s) => ({ settings: { ...s.settings, [k]: v } })),
+  resetSettings:   ()     => set({ settings: { ...DEFAULT_SETTINGS } }),
+  setCargando:     (v)    => set({ cargando: v }),
+  setExportandoPDF:(v)    => set({ exportandoPDF: v }),
+  setError:        (msg)  => set({ errorMsg: msg }),
+  setSettingsOpen: (v)    => set({ settingsOpen: v }),
 
   asignarSpot: (capaId, spot) =>
-    set((s) => ({ capas: s.capas.map((c) => c.id === capaId ? { ...c, spot } : c) })),
+    set((s) => ({
+      capas: s.capas.map((c) =>
+        c.id === capaId ? { ...c, spot } : c
+      ),
+    })),
+
+  // ── Asignar textura ───────────────────────────────────────────────────────
+  // Asigna spot 'texture' a la capa Y guarda texturaId + texturaDisp.
+  // Si la capa ya tiene otro spot, lo sobreescribe.
+  asignarTextura: (capaId, texturaId, texturaDisp) =>
+    set((s) => ({
+      capas: s.capas.map((c) =>
+        c.id === capaId
+          ? { ...c, spot: 'texture', texturaId, texturaDisp }
+          : c
+      ),
+    })),
 
   toggleVisible: (capaId) =>
-    set((s) => ({ capas: s.capas.map((c) => c.id === capaId ? { ...c, visible: !c.visible } : c) })),
+    set((s) => ({
+      capas: s.capas.map((c) =>
+        c.id === capaId ? { ...c, visible: !c.visible } : c
+      ),
+    })),
 
   resetEditor: () => set({
     proyectoId: null, proyectoNombre: '', imagenUrl: null,

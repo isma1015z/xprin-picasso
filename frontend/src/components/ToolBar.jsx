@@ -34,8 +34,13 @@ export function ToolBar() {
       })
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }))
-        throw new Error(err.detail ?? 'Error del servidor')
+        const raw = await res.text()
+        let detail = raw || res.statusText || 'Error del servidor'
+        try {
+          const err = JSON.parse(raw)
+          detail = err.detail ?? detail
+        } catch {}
+        throw new Error(detail)
       }
 
       const data = await res.json()
@@ -75,8 +80,13 @@ export function ToolBar() {
       })
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }))
-        throw new Error(err.detail ?? 'Error al generar el PDF')
+        const raw = await res.text()
+        let detail = raw || res.statusText || 'Error al generar el PDF'
+        try {
+          const err = JSON.parse(raw)
+          detail = err.detail ?? detail
+        } catch {}
+        throw new Error(detail)
       }
 
       const blob = await res.blob()

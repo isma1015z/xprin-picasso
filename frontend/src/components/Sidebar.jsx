@@ -1,26 +1,9 @@
-// Sidebar — diseño accordion de Prueba_EditorPicasso + capas/spots de XPRIN-Picasso
-// Secciones: Capas por color · Texturas · Spots UV
+// Sidebar — Capas por color · Texturas · Spots UV
 
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Search, Eye, EyeOff } from 'lucide-react'
 import { useStore } from '../store'
-
-// ── Texturas disponibles (importadas como rutas estáticas) ─────────────────
-const TEXTURES = [
-  {
-    id: 'water-droplets',
-    name: 'Water Droplets',
-    thumb: '/textures/WaterDropletsMixedBubbled001/WaterDropletsMixedBubbled001_COL_2K.jpg',
-    style: {},
-  },
-  { id: 'gradient-1', name: 'Cuero',       style: { background: 'linear-gradient(to bottom right, #a88d75, #755f4d)' } },
-  { id: 'gradient-2', name: 'Amatista',    style: { background: 'linear-gradient(to bottom right, #4A00E0, #8E2DE2)' } },
-  { id: 'gradient-3', name: 'Oceano',      style: { background: 'linear-gradient(135deg, #667db6, #0082c8, #667db6)' } },
-  { id: 'gradient-4', name: 'Fuego',       style: { background: 'linear-gradient(to right, #f12711, #f5af19)' } },
-  { id: 'gradient-5', name: 'Esmeralda',   style: { background: 'linear-gradient(to bottom right, #11998e, #38ef7d)' } },
-  { id: 'gradient-6', name: 'Titanio',     style: { background: 'linear-gradient(135deg, #434343, #000000)' } },
-  { id: 'gradient-7', name: 'Lavanda',     style: { background: 'linear-gradient(to right, #c471ed, #f64f59)' } },
-]
+import { TEXTURES } from '../textures'
 
 const SPOTS = [
   { value: null,      label: 'CMYK',    color: '#868e96' },
@@ -29,7 +12,7 @@ const SPOTS = [
   { value: 'texture', label: 'TEXTURE', color: '#f0b429' },
 ]
 
-// ── Accordion item ─────────────────────────────────────────────────────────
+// ── Accordion ─────────────────────────────────────────────────────────────
 function AccordionItem({ title, badge, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
@@ -39,7 +22,7 @@ function AccordionItem({ title, badge, children, defaultOpen = true }) {
         onClick={() => setOpen(!open)}
       >
         {open
-          ? <ChevronDown size={14} className="text-secondary shrink-0" />
+          ? <ChevronDown  size={14} className="text-secondary shrink-0" />
           : <ChevronRight size={14} className="text-secondary shrink-0" />}
         <span className="font-medium text-sm text-primary flex-1">{title}</span>
         {badge != null && (
@@ -73,14 +56,21 @@ function SpotBadge({ spot }) {
   )
 }
 
-// ── Sidebar principal ──────────────────────────────────────────────────────
+// ── Sidebar ────────────────────────────────────────────────────────────────
 export function Sidebar() {
-  const { capas, capaActivaId, setCapaActiva, asignarSpot, toggleVisible } = useStore()
+  const {
+    capas, capaActivaId,
+    setCapaActiva, asignarSpot, asignarTextura, toggleVisible,
+  } = useStore()
+
   const [texSearch, setTexSearch] = useState('')
+
   const filteredTex = TEXTURES.filter((t) =>
     t.name.toLowerCase().includes(texSearch.toLowerCase())
   )
-  const spotCount = capas.filter((c) => c.spot !== null).length
+
+  const spotCount  = capas.filter((c) => c.spot !== null).length
+  const capaActiva = capas.find((c) => c.id === capaActivaId)
 
   return (
     <aside className="w-[280px] bg-surface border-r border-border-strong flex flex-col overflow-y-auto shadow-[2px_0_8px_rgba(0,0,0,0.08)] shrink-0">
@@ -104,12 +94,8 @@ export function Sidebar() {
                 key={capa.id}
                 onClick={() => setCapaActiva(capa.id)}
                 className={`rounded-lg p-2.5 cursor-pointer transition-all duration-150
-                  ${isActive
-                    ? 'bg-accent/8 ring-1 ring-accent/30'
-                    : 'hover:bg-surface-hover'
-                  }`}
+                  ${isActive ? 'bg-accent/8 ring-1 ring-accent/30' : 'hover:bg-surface-hover'}`}
               >
-                {/* Fila superior */}
                 <div className="flex items-center gap-2">
                   <div
                     className="w-4 h-4 rounded-sm shrink-0 border border-black/10"
@@ -126,9 +112,7 @@ export function Sidebar() {
                     className="text-muted hover:text-primary transition-colors shrink-0"
                     title={capa.visible ? 'Ocultar' : 'Mostrar'}
                   >
-                    {capa.visible
-                      ? <Eye size={14} />
-                      : <EyeOff size={14} />}
+                    {capa.visible ? <Eye size={14} /> : <EyeOff size={14} />}
                   </button>
                 </div>
 
@@ -146,13 +130,29 @@ export function Sidebar() {
                       focus:border-accent focus:ring-1 focus:ring-accent/30 cursor-pointer"
                   >
                     {SPOTS.map((s) => (
-                      <option key={s.value ?? 'null'} value={s.value ?? ''}>
-                        {s.label}
-                      </option>
+                      <option key={s.value ?? 'null'} value={s.value ?? ''}>{s.label}</option>
                     ))}
                   </select>
                   <SpotBadge spot={capa.spot} />
                 </div>
+
+                {/* Textura asignada */}
+                {capa.spot === 'texture' && capa.texturaId && (() => {
+                  const tex = TEXTURES.find((t) => t.id === capa.texturaId)
+                  return tex ? (
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      <div
+                        className="w-5 h-5 rounded-sm overflow-hidden border border-border-light shrink-0"
+                        style={tex.thumb ? {} : tex.style}
+                      >
+                        {tex.thumb && (
+                          <img src={tex.thumb} alt={tex.name} className="w-full h-full object-cover" />
+                        )}
+                      </div>
+                      <span className="text-[11px] text-muted truncate">{tex.name}</span>
+                    </div>
+                  ) : null
+                })()}
 
                 <div className="mt-1 text-[11px] text-muted">
                   {capa.zonas.length} zona{capa.zonas.length !== 1 ? 's' : ''}
@@ -165,6 +165,14 @@ export function Sidebar() {
 
       {/* ── TEXTURAS ──────────────────────────────────────────────────────── */}
       <AccordionItem title="Texturas" defaultOpen={false}>
+
+        {/* Aviso si no hay capa activa */}
+        {!capaActivaId && (
+          <p className="text-[12px] text-muted italic">
+            Selecciona una capa para asignarle una textura.
+          </p>
+        )}
+
         <div className="relative flex items-center">
           <input
             type="text"
@@ -179,25 +187,39 @@ export function Sidebar() {
         </div>
 
         <div className="grid grid-cols-3 gap-2 mt-1">
-          {filteredTex.map((tex) => (
-            <button
-              key={tex.id}
-              title={tex.name}
-              className="h-[52px] rounded-md cursor-pointer border border-border-light
-                transition-all duration-200 hover:scale-105 hover:shadow-md
-                overflow-hidden bg-surface-elevated"
-              style={tex.thumb ? {} : tex.style}
-            >
-              {tex.thumb && (
-                <img
-                  src={tex.thumb}
-                  alt={tex.name}
-                  className="w-full h-full object-cover"
-                  draggable={false}
-                />
-              )}
-            </button>
-          ))}
+          {filteredTex.map((tex) => {
+            // Una textura está "activa" si la capa activa tiene ese texturaId
+            const isSelected =
+              capaActiva?.spot === 'texture' && capaActiva?.texturaId === tex.id
+
+            return (
+              <button
+                key={tex.id}
+                title={tex.name}
+                disabled={!capaActivaId}
+                onClick={() => {
+                  if (capaActivaId) asignarTextura(capaActivaId, tex.id, tex.disp)
+                }}
+                className={`h-[52px] rounded-md border transition-all duration-200 overflow-hidden
+                  bg-surface-elevated disabled:opacity-40 disabled:cursor-not-allowed
+                  ${capaActivaId ? 'cursor-pointer hover:scale-105 hover:shadow-md' : ''}
+                  ${isSelected
+                    ? 'border-accent ring-2 ring-accent shadow-md scale-105'
+                    : 'border-border-light'
+                  }`}
+                style={tex.thumb ? {} : tex.style}
+              >
+                {tex.thumb && (
+                  <img
+                    src={tex.thumb}
+                    alt={tex.name}
+                    className="w-full h-full object-cover"
+                    draggable={false}
+                  />
+                )}
+              </button>
+            )
+          })}
         </div>
 
         {filteredTex.length === 0 && (
@@ -212,10 +234,7 @@ export function Sidebar() {
             const n = capas.filter((c) => c.spot === s.value).length
             return (
               <div key={s.value} className="flex items-center gap-2.5">
-                <div
-                  className="w-3 h-3 rounded-sm shrink-0"
-                  style={{ background: s.color }}
-                />
+                <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
                 <span className="text-[13px] text-primary flex-1">{s.label}</span>
                 <span className="text-[11px] text-muted font-mono">{n} capa{n !== 1 ? 's' : ''}</span>
               </div>

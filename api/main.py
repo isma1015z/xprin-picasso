@@ -1,13 +1,19 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.requests import Request
 from dotenv import load_dotenv
-import os, uuid, json
+import os, uuid, json, traceback
 
 load_dotenv()
 
-app = FastAPI(title="XPRIN-Picasso API", version="0.7.0")
+app = FastAPI(title="XPRIN-Picasso API", version="0.8.2")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    traceback.print_exc()
+    return JSONResponse(status_code=500, content={"detail": f"unhandled: {exc}"})
 
 IMG_DIR    = os.path.join(os.path.dirname(__file__), "img", "uploads")
 EXPORT_DIR = os.path.join(os.path.dirname(__file__), "img", "exports")
@@ -19,14 +25,14 @@ def quitar_fondo(imagen_bytes: bytes) -> bytes:
     try:
         from rembg import remove
         return remove(imagen_bytes)
-    except Exception as e:
+    except BaseException as e:
         print(f"  [AVISO] rembg fallo ({e}), imagen original")
         return imagen_bytes
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.7.0"}
+    return {"status": "ok", "version": "0.8.2"}
 
 
 # ── POST /detect-color-zones ──────────────────────────────────────────────────
@@ -34,58 +40,60 @@ def health():
 async def detect_color_zones(
     imagen:      UploadFile = File(...),
     remove_bg:   bool  = Form(True),
-    n_colores:   int   = Form(0),       # 0 = automático
+    n_colores:   int   = Form(0),
     min_area:    int   = Form(400),
-    gauss_sigma: float = Form(1.5),     # suavizado gaussiano pre-cuantización
-    delta_e:     float = Form(12.0),    # umbral fusión capas similares
+    gauss_sigma: float = Form(1.5),
+    delta_e:     float = Form(12.0),
 ):
     from color_zone_detector import detectar_desde_bytes
 
     contenido = await imagen.read()
     if not contenido:
         raise HTTPException(status_code=400, detail="Imagen vacía")
-
-    # 1. Eliminar fondo
-    if remove_bg:
-        print("  Eliminando fondo con rembg...")
-        contenido = quitar_fondo(contenido)
-
-    # 2. Guardar imagen procesada (sin fondo)
-    proyecto_id = f"proj_{str(uuid.uuid4())[:8]}"
-    imagen_save = os.path.join(IMG_DIR, f"{proyecto_id}.png")
-
     try:
-        # 3. Gaussian blur + K-means + contornos
+        if remove_bg:
+            print("  Eliminando fondo con rembg...")
+            contenido = quitar_fondo(contenido)
+
+        proyecto_id = f"proj_{str(uuid.uuid4())[:8]}"
+        imagen_save = os.path.join(IMG_DIR, f"{proyecto_id}.png")
+
         resultado = detectar_desde_bytes(
-            imagen_bytes   = contenido,
-            nombre         = os.path.splitext(imagen.filename or "imagen")[0],
-            n_colores      = n_colores,
-            min_area       = min_area,
-            gauss_sigma    = gauss_sigma,
-            delta_e_umbral = delta_e,
+            imagen_bytes     = contenido,
+            nombre           = os.path.splitext(imagen.filename or "imagen")[0],
+            n_colores        = n_colores,
+            min_area         = min_area,
+            gauss_sigma      = gauss_sigma,
+            delta_e_umbral   = delta_e,
             imagen_save_path = imagen_save,
         )
+
+        resultado["id"] = proyecto_id
+
+        with open(os.path.join(IMG_DIR, f"{proyecto_id}.json"), "w") as f:
+            json.dump({"imagen_path": imagen_save}, f)
+
+        return {k: v for k, v in resultado.items() if not k.startswith("_")}
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    resultado["id"] = proyecto_id
-
-    # Sidecar con ruta de imagen
-    with open(os.path.join(IMG_DIR, f"{proyecto_id}.json"), "w") as f:
-        json.dump({"imagen_path": imagen_save}, f)
-
-    return {k: v for k, v in resultado.items() if not k.startswith("_")}
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"detect-color-zones: {e}")
 
 
 # ── POST /export-pdf ──────────────────────────────────────────────────────────
 @app.post("/export-pdf")
-async def export_pdf(proyecto: dict, preview: bool = False):
+async def export_pdf(
+    proyecto:     dict,
+    preview:      bool = False,
+    embed_imagen: bool = True,
+):
     from json_to_pdf import generar_pdf
 
     proyecto_id = proyecto.get("id", "")
     nombre      = proyecto.get("nombre", "proyecto")
 
-    # Buscar imagen guardada
     sidecar     = os.path.join(IMG_DIR, f"{proyecto_id}.json")
     imagen_path = None
     if os.path.isfile(sidecar):
@@ -98,7 +106,7 @@ async def export_pdf(proyecto: dict, preview: bool = False):
             if os.path.isfile(c):
                 imagen_path = c; break
 
-    if not imagen_path or not os.path.isfile(imagen_path):
+    if embed_imagen and (not imagen_path or not os.path.isfile(imagen_path)):
         raise HTTPException(status_code=404,
             detail=f"Imagen no encontrada para {proyecto_id}.")
 
@@ -109,10 +117,14 @@ async def export_pdf(proyecto: dict, preview: bool = False):
     pdf_path = os.path.join(EXPORT_DIR, f"{proyecto_id}{sufijo}")
 
     try:
-        generar_pdf(proyecto, imagen_path, pdf_path, preview=preview, conservar_ps=False)
+        generar_pdf(
+            proyecto, imagen_path, pdf_path,
+            preview=preview, conservar_ps=False, embed_imagen=embed_imagen,
+        )
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error generando PDF: {e}")
 
     if not os.path.isfile(pdf_path):
