@@ -1,10 +1,9 @@
 // Pagina principal del editor
 // Responsable: Andrea + Alejandro
 
-import { Canvas } from '../components/Canvas'
-import { ToolBar } from '../components/ToolBar'
-import { SpotPanel } from '../components/SpotPanel'
-import { TextureLibrary } from '../components/TextureLibrary'
+import { Canvas }       from '../components/Canvas'
+import { ToolBar }      from '../components/ToolBar'
+import { LayerPanel }   from '../components/LayerPanel'
 
 export function Editor() {
   return (
@@ -12,9 +11,8 @@ export function Editor() {
       <ToolBar />
       <div className="flex flex-1 overflow-hidden">
         <Canvas />
-        <SpotPanel />
+        <LayerPanel />
       </div>
-      <TextureLibrary />
     </div>
   )
 }
