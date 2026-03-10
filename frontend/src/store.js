@@ -1,42 +1,82 @@
 import { create } from 'zustand'
 
-// Estado global del editor
-// Responsable: Andrea + Alejandro
+const DEFAULT_SETTINGS = {
+  remove_bg:   true,
+  n_colores:   0,       // 0 = automático
+  min_area:    400,
+  gauss_sigma: 1.5,     // suavizado gaussiano
+  delta_e:     12.0,    // fusión capas similares
+}
 
-export const useStore = create((set) => ({
-  // Zona actualmente seleccionada en el canvas
-  zonaActiva: null,
+export const useStore = create((set, get) => ({
 
-  // Spot activo: 'white_base' | 'white_relieve' | 'varnish' | 'cmyk'
-  spotActivo: 'varnish',
+  proyectoId:     null,
+  proyectoNombre: '',
+  imagenUrl:      null,
+  imagenSize:     { ancho: 0, alto: 0 },
+  capas:          [],
+  capaActivaId:   null,
 
-  // Textura seleccionada para el spot activo
-  texturaActiva: null,
+  settings:     { ...DEFAULT_SETTINGS },
+  settingsOpen: false,
 
-  // Lista de zonas dibujadas en el canvas
-  zonas: [],
+  cargando:      false,
+  errorMsg:      null,
+  exportandoPDF: false,
 
-  // Historial para deshacer/rehacer (max 20 pasos)
-  historial: [],
+  // ── Acciones ──────────────────────────────────────────────────────────────
 
-  // Acciones
-  setZonaActiva:   (zona)    => set({ zonaActiva: zona }),
-  setSpotActivo:   (spot)    => set({ spotActivo: spot }),
-  setTexturaActiva:(textura) => set({ texturaActiva: textura }),
+  setProyecto: ({ proyectoId, nombre, imagenUrl, ancho, alto, capas }) =>
+    set({
+      proyectoId,
+      proyectoNombre: nombre,
+      imagenUrl,
+      imagenSize: { ancho, alto },
+      capas,
+      capaActivaId: capas.length > 0 ? capas[0].id : null,
+      errorMsg: null,
+    }),
 
-  addZona: (zona) => set((state) => ({
-    zonas: [...state.zonas, zona]
-  })),
+  setCapaActiva:  (id)  => set({ capaActivaId: id }),
+  setSetting:     (k, v) => set((s) => ({ settings: { ...s.settings, [k]: v } })),
+  resetSettings:  ()    => set({ settings: { ...DEFAULT_SETTINGS } }),
+  setCargando:    (v)   => set({ cargando: v }),
+  setExportandoPDF:(v)  => set({ exportandoPDF: v }),
+  setError:       (msg) => set({ errorMsg: msg }),
+  setSettingsOpen:(v)   => set({ settingsOpen: v }),
 
-  removeZona: (id) => set((state) => ({
-    zonas: state.zonas.filter((z) => z.id !== id)
-  })),
+  asignarSpot: (capaId, spot) =>
+    set((s) => ({ capas: s.capas.map((c) => c.id === capaId ? { ...c, spot } : c) })),
+
+  toggleVisible: (capaId) =>
+    set((s) => ({ capas: s.capas.map((c) => c.id === capaId ? { ...c, visible: !c.visible } : c) })),
 
   resetEditor: () => set({
-    zonaActiva: null,
-    spotActivo: 'varnish',
-    texturaActiva: null,
-    zonas: [],
-    historial: [],
+    proyectoId: null, proyectoNombre: '', imagenUrl: null,
+    imagenSize: { ancho: 0, alto: 0 }, capas: [], capaActivaId: null,
+    cargando: false, errorMsg: null, exportandoPDF: false,
   }),
+
+  getProyectoJSON: () => {
+    const s = get()
+    return {
+      version:   '1.0',
+      id:        s.proyectoId,
+      nombre:    s.proyectoNombre,
+      documento: { ancho: s.imagenSize.ancho, alto: s.imagenSize.alto, unidad: 'px', resolucion: 72 },
+      capas:     s.capas,
+    }
+  },
+
+  buildDetectionForm: (file) => {
+    const { settings: s } = get()
+    const fd = new FormData()
+    fd.append('imagen',      file)
+    fd.append('remove_bg',   String(s.remove_bg))
+    fd.append('n_colores',   String(s.n_colores))
+    fd.append('min_area',    String(s.min_area))
+    fd.append('gauss_sigma', String(s.gauss_sigma))
+    fd.append('delta_e',     String(s.delta_e))
+    return fd
+  },
 }))
