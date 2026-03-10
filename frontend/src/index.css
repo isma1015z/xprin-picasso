@@ -1,1 +1,48 @@
 @import "tailwindcss";
+
+@keyframes textShine {
+
+  0% {
+    background-position: -200% center;
+  }
+
+  8% {
+    background-position: 200% center;
+  }
+
+  100% {
+    background-position: 200% center;
+  }
+
+}
+
+.logo-shine {
+
+  background: linear-gradient(
+    120deg,
+    #ffffff 0%,
+    #ffffff 45%,
+    rgba(255,255,255,0.4) 50%,
+    #ffffff 55%,
+    #ffffff 100%
+  );
+
+  background-size: 250% auto;
+
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  animation: textShine 25s infinite;
+
+}
+
+@font-face {
+  font-family: "xprin";
+  src: url("./assets/fonts/xprin.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+.font-xprin {
+  font-family: "xprin", sans-serif;
+}
