@@ -3,13 +3,13 @@ color_zone_detector.py  —  XPRIN-Picasso  (v8 — pipeline simple)
 -----------------------------------------------------------------
 Pipeline directo inspirado en el enfoque del editor externo:
 
-  1. Gaussian blur          suaviza bordes antes de cuantizar
-  2. K-means                agrupa píxeles por color dominante
-  3. Por cada color:
-       - Máscara binaria
-       - Componentes conectados (cc)
-       - findContours + approxPolyDP (equivalente al RDP del editor JS)
-  4. Devolver capas JSON
+    1. Gaussian blur          suaviza bordes antes de cuantizar
+    2. K-means                agrupa píxeles por color dominante
+    3. Por cada color:
+        - Máscara binaria
+        - Componentes conectados (cc)
+        - findContours + approxPolyDP (equivalente al RDP del editor JS)
+4. Devolver capas JSON
 
 Sin tiling, sin Canny, sin bilateral, sin CLAHE, sin subpixel.
 La simplicidad es la robustez.
@@ -27,6 +27,7 @@ import json
 import os
 import argparse
 import uuid
+import math
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -34,7 +35,7 @@ from typing import Optional
 DEFAULT_N_COLORES   = 0       # 0 = automático
 DEFAULT_MIN_AREA    = 400     # px² mínimo por zona
 DEFAULT_GAUSS_SIGMA = 1.5     # suavizado pre-cuantización
-DEFAULT_EPSILON_PCT = 0.002   # tolerancia RDP (fracción del perímetro)
+DEFAULT_EPSILON_PCT = 0.0012  # tolerancia RDP (fracción del perímetro)
 DEFAULT_DELTA_E     = 12.0    # umbral fusión de capas similares
 MAX_K               = 14      # máximo de colores auto
 
@@ -56,9 +57,135 @@ def bgr_to_hex(b, g, r):
 
 def auto_k(bgr_blur, mask, techo=MAX_K):
     """Estima K contando colores únicos tras cuantización 5-bit."""
+    if mask is None or int(mask.sum()) == 0:
+        return 1
     q  = (bgr_blur[mask].astype(np.int32) // 8) * 8
+    if q.size == 0:
+        return 1
     n  = len(np.unique(q.view(np.dtype((np.void, q.dtype.itemsize * 3)))))
     return max(3, min(n, techo))
+
+def elegir_prefiltro_auto(bgr: np.ndarray, mask: np.ndarray) -> str:
+    """Heurística simple: logos/bordes duros -> median; foto/ruido -> bilateral."""
+    roi = bgr[mask]
+    if roi.size == 0:
+        return "median"
+    # Variación de color global (fotos suelen tener más rango tonal).
+    color_std = float(np.std(roi.reshape(-1, 3)))
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 80, 180)
+    edge_density = float((edges[mask] > 0).sum()) / float(mask.sum() + 1e-6)
+    if color_std > 42.0 or edge_density > 0.11:
+        return "bilateral"
+    return "median"
+
+def aplicar_prefiltro(
+    bgr: np.ndarray,
+    mask: np.ndarray,
+    gauss_sigma: float,
+    filtro: str = "auto",
+) -> tuple[np.ndarray, str]:
+    modo = filtro
+    if modo == "auto":
+        modo = elegir_prefiltro_auto(bgr, mask)
+
+    if modo == "bilateral":
+        d = max(5, int(gauss_sigma * 8 + 1) | 1)
+        out = cv2.bilateralFilter(bgr, d, 35, 35)
+    elif modo == "gaussian":
+        ksize = max(3, int(gauss_sigma * 6 + 1) | 1)
+        out = cv2.GaussianBlur(bgr, (ksize, ksize), gauss_sigma)
+    else:
+        # median preserva mejor esquinas duras en logos.
+        ksize = max(3, int(gauss_sigma * 6 + 1) | 1)
+        out = cv2.medianBlur(bgr, ksize)
+
+    out[~mask] = 0
+    return out, modo
+
+def min_area_adaptativa(alto: int, ancho: int, min_area_usuario: int) -> int:
+    """Reduce el umbral en imágenes medianas para no perder detalles finos."""
+    area_img = max(1, int(alto * ancho))
+    # Escala con tamaño de imagen, pero nunca supera el valor usuario.
+    auto = int(area_img * 0.00018) + 20
+    auto = max(24, auto)
+    return max(12, min(int(min_area_usuario), auto))
+
+def kernel_cierre_adaptativo(mascara: np.ndarray, edges: np.ndarray) -> int:
+    pix = int((mascara > 0).sum())
+    if pix <= 0:
+        return 1
+    dens = float((edges[mascara > 0] > 0).sum()) / float(pix)
+    # Borde complejo: no cerrar demasiado para no engordar ni romper trazos finos.
+    if dens > 0.12:
+        return 1
+    if dens > 0.06:
+        return 2
+    return 3
+
+def contorno_elipse_si_circular(
+    contorno: np.ndarray,
+    circularidad: float,
+    area_c: float,
+) -> Optional[np.ndarray]:
+    """Devuelve puntos de elipse solo en formas realmente circulares."""
+    if circularidad < 0.78 or area_c < 40.0 or len(contorno) < 8:
+        return None
+    try:
+        (cx, cy), (w, h), ang = cv2.fitEllipse(contorno)
+    except Exception:
+        return None
+    if w <= 0 or h <= 0:
+        return None
+    ratio = min(w, h) / max(w, h)
+    if ratio < 0.55:
+        return None
+
+    steps = 36 if area_c < 800 else 48
+    t = np.linspace(0.0, 2.0 * math.pi, steps, endpoint=False)
+    a = w / 2.0
+    b = h / 2.0
+    rad = math.radians(ang)
+    cosr = math.cos(rad)
+    sinr = math.sin(rad)
+    pts = []
+    for tt in t:
+        x0 = a * math.cos(tt)
+        y0 = b * math.sin(tt)
+        x = cx + (x0 * cosr - y0 * sinr)
+        y = cy + (x0 * sinr + y0 * cosr)
+        pts.append([int(round(x)), int(round(y))])
+    return np.array(pts, dtype=np.int32)
+
+def contorno_a_puntos(contorno: np.ndarray, area_hint: float, epsilon_pct: float) -> Optional[np.ndarray]:
+    """Convierte contorno OpenCV a puntos de polígono, con ajuste adaptativo."""
+    perimetro = max(1.0, cv2.arcLength(contorno, True))
+    area_c = max(1.0, float(cv2.contourArea(contorno)))
+    circularidad = float(4.0 * math.pi * area_c / (perimetro * perimetro))
+
+    factor = 1.0
+    if area_hint < 2000:
+        factor *= 0.75
+    if area_hint < 1000:
+        factor *= 0.80
+    if circularidad < 0.20:
+        factor *= 0.70
+    elif circularidad > 0.60:
+        factor *= 0.60
+    if circularidad > 0.78:
+        factor *= 0.80
+
+    epsilon = max(0.2, epsilon_pct * factor * perimetro)
+    approx = cv2.approxPolyDP(contorno, epsilon, True)
+    if len(approx) < 3:
+        return None
+
+    puntos_np = contorno_elipse_si_circular(contorno, circularidad, area_c)
+    if puntos_np is None:
+        puntos_np = approx.reshape(-1, 2)
+    if puntos_np.shape[0] < 3:
+        return None
+    return puntos_np
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -72,6 +199,7 @@ def detectar_capas(
     gauss_sigma: float = DEFAULT_GAUSS_SIGMA,
     epsilon_pct: float = DEFAULT_EPSILON_PCT,
     delta_e_umbral: float = DEFAULT_DELTA_E,
+    filtro:      str   = "auto",
     debug:       bool  = False,
 ) -> dict:
 
@@ -91,20 +219,26 @@ def detectar_capas(
     alpha = img[:, :, 3]
     mask  = alpha > 10              # píxeles válidos (no fondo)
 
+    # Fallback robusto: algunas imágenes llegan totalmente transparentes.
+    # Si no hay píxeles válidos por alpha, usamos todos los píxeles.
+    if int(mask.sum()) == 0:
+        mask = np.ones((alto, ancho), dtype=bool)
+
     print(f"  Imagen: {ancho}×{alto}px  |  píxeles válidos: {mask.sum()}")
 
-    # ── 1. Gaussian blur — suaviza bordes antes de cuantizar ──────────────────
-    ksize = max(3, int(gauss_sigma * 6 + 1) | 1)   # impar
-    bgr_blur = cv2.GaussianBlur(bgr, (ksize, ksize), gauss_sigma)
-    bgr_blur[~mask] = 0
-
-    print(f"  Gaussian sigma={gauss_sigma}  kernel={ksize}×{ksize}")
+    # ── 1. Prefiltro (auto) antes de cuantizar ────────────────────────────────
+    bgr_blur, filtro_usado = aplicar_prefiltro(bgr, mask, gauss_sigma, filtro=filtro)
+    print(f"  Prefiltro={filtro_usado} sigma={gauss_sigma}")
 
     # ── 2. K-means color quantization ─────────────────────────────────────────
     k = n_colores if n_colores > 0 else auto_k(bgr_blur, mask)
+    pix_val = bgr_blur[mask].astype(np.float32)
+    if pix_val.size == 0:
+        raise ValueError("No hay píxeles válidos para detectar zonas de color.")
+    max_k = max(1, int(pix_val.shape[0]))
+    k = max(1, min(int(k), max_k))
     print(f"  K={k} colores")
 
-    pix_val = bgr_blur[mask].astype(np.float32)
     _, labels, centros = cv2.kmeans(
         pix_val, k, None,
         (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.5),
@@ -119,68 +253,136 @@ def detectar_capas(
 
     # ── 3. Contornos por color ─────────────────────────────────────────────────
     zonas = []
+    min_area_eff = min_area_adaptativa(alto, ancho, min_area)
+    min_area_rescate = max(10, int(min_area_eff * 0.28))
+    edges_ref = cv2.Canny(cv2.cvtColor(bgr_blur, cv2.COLOR_BGR2GRAY), 70, 170)
+    print(f"  min_area efectivo={min_area_eff}  rescate={min_area_rescate}")
 
     for ki in range(k):
         mascara = ((label_map == ki) & mask).astype(np.uint8) * 255
 
-        # Pequeño cierre morfológico para rellenar gaps de 1px
-        mascara = cv2.morphologyEx(
-            mascara, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8)
-        )
+        kclose = kernel_cierre_adaptativo(mascara, edges_ref)
+        if kclose > 1:
+            mascara = cv2.morphologyEx(
+                mascara, cv2.MORPH_CLOSE, np.ones((kclose, kclose), np.uint8)
+            )
 
         # Componentes conectados — cada isla es una zona separada
         n_cc, cc_labels, stats, _ = cv2.connectedComponentsWithStats(
             mascara, connectivity=8
         )
+        comps_grandes = []
+        comps_peq = []
 
         for cc_id in range(1, n_cc):
             area = int(stats[cc_id, cv2.CC_STAT_AREA])
-            if area < min_area:
-                continue
+            if area >= min_area_eff:
+                comps_grandes.append(cc_id)
+            elif area >= min_area_rescate:
+                comps_peq.append(cc_id)
+
+        comps_final = set(comps_grandes)
+        if comps_peq:
+            union_grandes = np.zeros_like(mascara, dtype=np.uint8)
+            for cc_id in comps_grandes:
+                union_grandes[cc_labels == cc_id] = 255
+
+            if int(union_grandes.sum()) > 0:
+                radio = 2 if kclose <= 2 else 3
+                cerca_grandes = cv2.dilate(
+                    union_grandes, np.ones((radio * 2 + 1, radio * 2 + 1), np.uint8)
+                )
+                for cc_id in comps_peq:
+                    cc_mask_bin = (cc_labels == cc_id)
+                    if np.any(cerca_grandes[cc_mask_bin] > 0):
+                        comps_final.add(cc_id)
+            else:
+                # Si no hay grandes, conservar pequeñas relevantes para no perder detalles.
+                comps_peq_sorted = sorted(
+                    comps_peq,
+                    key=lambda idx: int(stats[idx, cv2.CC_STAT_AREA]),
+                    reverse=True,
+                )
+                for cc_id in comps_peq_sorted[:8]:
+                    area = int(stats[cc_id, cv2.CC_STAT_AREA])
+                    if area >= max(min_area_rescate, int(min_area_eff * 0.45)):
+                        comps_final.add(cc_id)
+
+        for cc_id in sorted(comps_final):
+            area = int(stats[cc_id, cv2.CC_STAT_AREA])
 
             # Máscara de esta componente
             cc_mask = (cc_labels == cc_id).astype(np.uint8) * 255
 
-            # findContours — RETR_EXTERNAL: solo contorno exterior
-            contornos, _ = cv2.findContours(
-                cc_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+            # findContours con jerarquía: contorno exterior + agujeros internos
+            contornos, jerarquia = cv2.findContours(
+                cc_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE
             )
-            if not contornos:
+            if not contornos or jerarquia is None:
                 continue
 
-            # El contorno más grande de esta componente
-            contorno = max(contornos, key=cv2.contourArea)
-            if cv2.contourArea(contorno) < min_area:
-                continue
+            h = jerarquia[0]
+            exteriores = [idx for idx, node in enumerate(h) if node[3] == -1]
 
-            # approxPolyDP — equivalente al RDP del editor JS
-            epsilon = epsilon_pct * cv2.arcLength(contorno, True)
-            approx  = cv2.approxPolyDP(contorno, epsilon, True)
-            if len(approx) < 3:
-                continue
+            for idx_ext in exteriores:
+                contorno_ext = contornos[idx_ext]
+                if cv2.contourArea(contorno_ext) < min_area_rescate:
+                    continue
 
-            # Convertir a forma PS (flip Y)
-            puntos = [(float(p[0][0]), float(p[0][1])) for p in approx]
-            forma  = [
-                {"tipo": "moveto" if i == 0 else "lineto",
-                 "x": round(x, 2),
-                 "y": round(float(alto) - y, 2)}
-                for i, (x, y) in enumerate(puntos)
-            ]
-            forma.append({"tipo": "closepath"})
+                puntos_ext = contorno_a_puntos(
+                    contorno_ext,
+                    area_hint=max(float(area), float(cv2.contourArea(contorno_ext))),
+                    epsilon_pct=epsilon_pct,
+                )
+                if puntos_ext is None:
+                    continue
 
-            x_b, y_b, w_b, h_b = cv2.boundingRect(contorno)
-            b_v, g_v, r_v = (int(c) for c in centros[ki])
+                forma = []
+                puntos = [(float(p[0]), float(p[1])) for p in puntos_ext]
+                forma.extend(
+                    {"tipo": "moveto" if i == 0 else "lineto",
+                     "x": round(x, 2),
+                     "y": round(float(alto) - y, 2)}
+                    for i, (x, y) in enumerate(puntos)
+                )
+                forma.append({"tipo": "closepath"})
+                n_puntos_total = len(puntos)
 
-            zonas.append({
-                "_ki":     ki,
-                "_color":  (b_v, g_v, r_v),
-                "id":      f"zona_{str(uuid.uuid4())[:8]}",
-                "area_px": area,
-                "bbox":    {"x": x_b, "y": y_b, "w": w_b, "h": h_b},
-                "forma":   forma,
-                "n_puntos": len(puntos),
-            })
+                # Hijos directos = agujeros del exterior
+                hijos = [j for j, node in enumerate(h) if node[3] == idx_ext]
+                for idx_h in hijos:
+                    ch = contornos[idx_h]
+                    if cv2.contourArea(ch) < 6.0:
+                        continue
+                    puntos_h = contorno_a_puntos(
+                        ch,
+                        area_hint=float(cv2.contourArea(ch)),
+                        epsilon_pct=epsilon_pct * 0.9,
+                    )
+                    if puntos_h is None:
+                        continue
+                    pts_h = [(float(p[0]), float(p[1])) for p in puntos_h]
+                    forma.extend(
+                        {"tipo": "moveto" if i == 0 else "lineto",
+                         "x": round(x, 2),
+                         "y": round(float(alto) - y, 2)}
+                        for i, (x, y) in enumerate(pts_h)
+                    )
+                    forma.append({"tipo": "closepath"})
+                    n_puntos_total += len(pts_h)
+
+                x_b, y_b, w_b, h_b = cv2.boundingRect(contorno_ext)
+                b_v, g_v, r_v = (int(c) for c in centros[ki])
+
+                zonas.append({
+                    "_ki":      ki,
+                    "_color":   (b_v, g_v, r_v),
+                    "id":       f"zona_{str(uuid.uuid4())[:8]}",
+                    "area_px":  area,
+                    "bbox":     {"x": x_b, "y": y_b, "w": w_b, "h": h_b},
+                    "forma":    forma,
+                    "n_puntos": n_puntos_total,
+                })
 
     print(f"  Zonas brutas: {len(zonas)}")
 
@@ -252,9 +454,12 @@ def detectar_capas(
         "documento":  {"ancho": ancho, "alto": alto, "unidad": "px", "resolucion": 72},
         "imagenBase": {"ruta": nombre_archivo, "ancho": ancho, "alto": alto},
         "metadatos":  {
-            "metodo":      "gaussian+kmeans+contours",
+            "metodo":      "prefilter+kmeans+contours",
+            "prefiltro":   filtro_usado,
             "gauss_sigma": gauss_sigma,
             "k_colores":   k,
+            "min_area_user": min_area,
+            "min_area_eff": min_area_eff,
             "epsilon_pct": epsilon_pct,
             "delta_e":     delta_e_umbral,
             "n_capas":     len(capas),
@@ -275,6 +480,7 @@ def detectar_desde_bytes(
     gauss_sigma:      float = DEFAULT_GAUSS_SIGMA,
     epsilon_pct:      float = DEFAULT_EPSILON_PCT,
     delta_e_umbral:   float = DEFAULT_DELTA_E,
+    filtro:           str   = "auto",
     imagen_save_path: Optional[str] = None,
 ) -> dict:
     import tempfile
@@ -299,6 +505,7 @@ def detectar_desde_bytes(
             n_colores=n_colores, min_area=min_area,
             gauss_sigma=gauss_sigma, epsilon_pct=epsilon_pct,
             delta_e_umbral=delta_e_umbral,
+            filtro=filtro,
         )
         r["imagenBase"]["ruta"] = nombre
         return r

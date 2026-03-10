@@ -1,21 +1,21 @@
 // Header — diseño de Prueba_EditorPicasso + funcionalidad XPRIN-Picasso
 // Subir imagen · Ajustes de detección · Exportar PDF · Tema
 
-import { useRef } from 'react'
-import { Upload, Sun, Moon, FileDown, Settings2, LogOut } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Upload, Sun, Moon, FileDown, ChevronDown, LogOut } from 'lucide-react'
 import { useStore } from '../store'
 import { DetectionSettings } from './DetectionSettings'
 
-const API = '/api'
-
 export function Header({ theme, toggleTheme }) {
-  const fileInputRef = useRef(null)
+  const fileInputRef  = useRef(null)
+  const [exportMenu, setExportMenu] = useState(false)
   const {
     imagenUrl, capas, cargando, exportandoPDF, errorMsg,
     setProyecto, setCargando, setExportandoPDF, setError, resetEditor,
     getProyectoJSON, proyectoNombre, buildDetectionForm,
   } = useStore()
 
+  // ── Subir imagen ──────────────────────────────────────────────────────────
   async function handleImageUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -28,8 +28,10 @@ export function Header({ theme, toggleTheme }) {
         body: buildDetectionForm(file),
       })
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }))
-        throw new Error(err.detail ?? 'Error del servidor')
+        const raw = await res.text()
+        let detail = raw || res.statusText || 'Error del servidor'
+        try { detail = JSON.parse(raw).detail ?? detail } catch {}
+        throw new Error(detail)
       }
       const data = await res.json()
       setProyecto({
@@ -48,26 +50,37 @@ export function Header({ theme, toggleTheme }) {
     }
   }
 
-  async function handleExport() {
+  // ── Exportar PDF ─────────────────────────────────────────────────────────
+  async function handleExport({ embedImagen = true, preview = false } = {}) {
+    setExportMenu(false)
     const spots = capas.filter((c) => c.spot !== null)
-    if (!spots.length) { setError('Asigna al menos una capa a un spot antes de exportar.'); return }
+    if (!spots.length) {
+      setError('Asigna al menos una capa a un spot antes de exportar.')
+      return
+    }
     setExportandoPDF(true)
     setError(null)
     try {
-      const res = await fetch('/api/export-pdf', {
-        method: 'POST',
+      const params = new URLSearchParams()
+      if (preview)       params.set('preview', 'true')
+      if (!embedImagen)  params.set('embed_imagen', 'false')
+
+      const res = await fetch(`/api/export-pdf?${params}`, {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(getProyectoJSON()),
+        body:    JSON.stringify(getProyectoJSON()),
       })
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }))
-        throw new Error(err.detail ?? 'Error al generar el PDF')
+        const raw = await res.text()
+        let detail = raw || res.statusText
+        try { detail = JSON.parse(raw).detail ?? detail } catch {}
+        throw new Error(detail)
       }
       const blob = await res.blob()
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href     = url
-      a.download = `${proyectoNombre || 'proyecto'}_spots.pdf`
+      a.download = `${proyectoNombre || 'proyecto'}${preview ? '_preview' : '_spots'}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {
@@ -106,47 +119,85 @@ export function Header({ theme, toggleTheme }) {
             bg-surface-elevated text-secondary hover:bg-surface-hover hover:text-primary hover:border-border-strong
             transition-all duration-200 disabled:opacity-50 cursor-pointer"
         >
-          {cargando ? (
-            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-            </svg>
-          ) : (
-            <Upload size={15} />
-          )}
+          {cargando
+            ? <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+            : <Upload size={15} />
+          }
           {cargando ? 'Detectando...' : imagenUrl ? 'Cambiar imagen' : 'Subir imagen'}
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="hidden"
-          onChange={handleImageUpload}
-        />
+        <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp"
+          className="hidden" onChange={handleImageUpload} />
 
         {/* Ajustes detección */}
         <DetectionSettings />
 
-        {/* Exportar PDF */}
+        {/* Exportar PDF — botón principal + dropdown */}
         {imagenUrl && (
-          <button
-            onClick={handleExport}
-            disabled={exportandoPDF || spotCount === 0}
-            title={spotCount === 0 ? 'Asigna al menos una capa a un spot' : 'Exportar PDF con separaciones UV'}
-            className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
-              bg-accent text-white hover:bg-accent-hover
-              transition-all duration-200 disabled:opacity-40 cursor-pointer"
-          >
-            {exportandoPDF ? (
-              <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-              </svg>
-            ) : (
-              <FileDown size={15} />
+          <div className="relative">
+            <div className={`flex rounded-md overflow-hidden border transition-all duration-200
+              ${spotCount === 0 ? 'opacity-40 pointer-events-none' : ''}
+              ${exportandoPDF ? 'opacity-70 pointer-events-none' : ''}`}
+            >
+              {/* Botón principal — exporta con imagen (estándar) */}
+              <button
+                onClick={() => handleExport({ embedImagen: true })}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium
+                  bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer"
+                title="Exportar PDF con imagen embebida"
+              >
+                {exportandoPDF
+                  ? <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                  : <FileDown size={15} />
+                }
+                {exportandoPDF ? 'Generando...' : 'Exportar PDF'}
+              </button>
+
+              {/* Flecha para opciones adicionales */}
+              <button
+                onClick={() => setExportMenu((v) => !v)}
+                className="flex items-center justify-center px-2 py-2 bg-accent hover:bg-accent-hover
+                  text-white border-l border-white/20 transition-colors cursor-pointer"
+                title="Opciones de exportación"
+              >
+                <ChevronDown size={13} className={`transition-transform ${exportMenu ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+
+            {/* Menú desplegable de opciones */}
+            {exportMenu && (
+              <div className="absolute top-full right-0 mt-1 z-50 w-56 bg-surface rounded-lg shadow-xl
+                border border-border-strong overflow-hidden"
+                onMouseLeave={() => setExportMenu(false)}
+              >
+                <button
+                  onClick={() => handleExport({ embedImagen: true })}
+                  className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover
+                    transition-colors cursor-pointer"
+                >
+                  <div className="font-medium">Con imagen</div>
+                  <div className="text-xs text-muted">PDF completo para revisión</div>
+                </button>
+                <div className="border-t border-border-light" />
+                <button
+                  onClick={() => handleExport({ embedImagen: false })}
+                  className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover
+                    transition-colors cursor-pointer"
+                >
+                  <div className="font-medium">Solo spots (RIP)</div>
+                  <div className="text-xs text-muted">Sin imagen — más ligero para el RIP</div>
+                </button>
+                <div className="border-t border-border-light" />
+                <button
+                  onClick={() => handleExport({ embedImagen: true, preview: true })}
+                  className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover
+                    transition-colors cursor-pointer"
+                >
+                  <div className="font-medium">Preview (RGB)</div>
+                  <div className="text-xs text-muted">Spots en color para verificar</div>
+                </button>
+              </div>
             )}
-            {exportandoPDF ? 'Generando...' : 'Exportar PDF'}
-          </button>
+          </div>
         )}
 
         {/* Error inline */}
@@ -158,12 +209,11 @@ export function Header({ theme, toggleTheme }) {
       {/* Derecha: contador spots + tema + reset */}
       <div className="flex items-center gap-3">
         {capas.length > 0 && (
-          <span className="text-xs text-muted">
+          <span className="text-xs text-muted select-none">
             {spotCount}/{capas.length} spots
           </span>
         )}
 
-        {/* Toggle tema */}
         <button
           onClick={toggleTheme}
           aria-label="Toggle theme"
@@ -173,7 +223,6 @@ export function Header({ theme, toggleTheme }) {
           {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
         </button>
 
-        {/* Reset (solo si hay imagen) */}
         {imagenUrl && (
           <button
             onClick={resetEditor}
