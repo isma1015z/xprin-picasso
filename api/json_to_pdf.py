@@ -254,6 +254,102 @@ def _imagen_a_ps_bloque(imagen_path: str, ancho_doc: int, alto_doc: int) -> list
     ] + hex_lines + [">", "Q", ""]
 
 
+def _textura_disp_ps_bloque(disp_path: str, ancho_doc: int, alto_doc: int, spot_key: str, opacidad: float, preview: bool) -> list[str]:
+    """Crea un bloque de imagen a escala del documento usando la imagen DISP en el espacio de color spot (o RGB si es preview)."""
+    if not HAS_PILLOW or not os.path.isfile(disp_path):
+        return [f"% [AVISO] Pillow no instalado o archivo {disp_path} no encontrado", ""]
+
+    try:
+        img = Image.open(disp_path).convert("L")
+    except Exception as e:
+        return [f"% [AVISO] Error abriendo textura DISP: {e}", ""]
+
+    # Queremos que la textura se repita (tiling) cada 400 puntos (como en Frontend) o escalada.
+    # Para coincidir con SVG <pattern width="400" height="400">, tileamos cada 400px.
+    # Para no generar un PS enorme, limitamos la imagen de salida a un tamano razonable (MAX_IMG_PX).
+    out_w = min(ancho_doc, int(MAX_IMG_PX * 1.5))
+    out_h = min(alto_doc, int(MAX_IMG_PX * 1.5))
+
+    fondo = Image.new("L", (out_w, out_h), color=0)
+    # Escalar el tile source a la proporcion de 400 del frontend.
+    # El Frontend hace pattern de 400x400 CSS. Si ancho_doc se dibuja a 1:1, el tile es 400px.
+    # Redimensionamos el tile source para que supla esa proporcion si document es mayor.
+    tile_w = int((400 * out_w) / ancho_doc) if ancho_doc else 400
+    tile_h = int((400 * out_h) / alto_doc) if alto_doc else 400
+    if tile_w < 1: tile_w = 400
+    if tile_h < 1: tile_h = 400
+
+    img = img.resize((tile_w, tile_h), Image.LANCZOS)
+    for y in range(0, out_h, tile_h):
+        for x in range(0, out_w, tile_w):
+            fondo.paste(img, (x, y))
+
+    # Convertir a hexa
+    iw, ih = fondo.size
+    hex_data  = fondo.tobytes().hex().upper()
+    hex_lines = [hex_data[i:i+76] for i in range(0, len(hex_data), 76)]
+
+    if preview:
+        r, g, b = SPOT_CHANNELS[spot_key]["preview_rgb"]
+        header = [
+            f"  {r:.4f} {g:.4f} {b:.4f} setrgbcolor",
+            # En preview no pintamos la imagen real pixel-a-pixel al tint, pintamos un gris simulado?
+            # Para preview dibujamos como DeviceGray pero usando Multiply o simplemente solido.
+            # Por simplicidad en preview coloreado, no vamos a simular el patron de la textura compleja. 
+            # Pero podemos usar la textura DISP como DeviceGray.
+            f"  {ancho_doc} {alto_doc} scale",
+            "  /DeviceGray setcolorspace",
+            "  <<\n    /ImageType 1",
+            f"    /Width {iw}\n    /Height {ih}\n    /BitsPerComponent 8",
+            "    /Decode [0 1]", # Invertimos decode si es necesario, asumimos 0=negro
+            f"    /ImageMatrix [{iw} 0 0 {-ih} 0 {ih}]",
+            "    /DataSource currentfile /ASCIIHexDecode filter\n  >>",
+            "  image"
+        ]
+    else:
+        # Modo impresion: aplicamos color spot
+        # Usamos _spot_block_ps OMITIENDO el setcolor (la imagen define los tint)
+        ch_nombre = SPOT_CHANNELS[spot_key]["nombre"]
+        a1, a2, b1, b2, c1, c2 = SPOT_CHANNELS[spot_key]["coefs"]
+        
+        sep_code = (
+            f"[/Separation ({ch_nombre}) [/CIEBasedABC <<\n"
+            f"  /RangeABC [0 100 -128 127 -128 127]\n"
+            f"  /DecodeABC [{{16 add 116 div}} bind {{500 div}} bind {{200 div}} bind]\n"
+            f"  /MatrixABC [1 1 1 1 0 0 0 0 -1]\n"
+            f"  /DecodeLMN\n"
+            f"    [{{dup 6 29 div ge {{dup dup mul mul}}\n"
+            f"       {{4 29 div sub 108 841 div mul}} ifelse 0.9637 mul}} bind\n"
+            f"     {{dup 6 29 div ge {{dup dup mul mul}}\n"
+            f"       {{4 29 div sub 108 841 div mul}} ifelse 1.0000 mul}} bind\n"
+            f"     {{dup 6 29 div ge {{dup dup mul mul}}\n"
+            f"       {{4 29 div sub 108 841 div mul}} ifelse 0.8241 mul}} bind]\n"
+            f"  /WhitePoint [0.9637 1.0000 0.8241]\n"
+            f"  /BlackPoint [0 0 0]\n"
+            f">>]\n"
+            f"{{  dup 0 lt {{ pop 0 }} {{ dup 1 gt {{ pop 1 }} if }} ifelse\n"
+            f"  0 index {opacidad:.4f} exp {a1:.4f} mul {a2:.4f} add\n"
+            f"  1 index {opacidad:.4f} exp {b1:.4f} mul {b2:.4f} add\n"
+            f"  2 index {opacidad:.4f} exp {c1:.4f} mul {c2:.4f} add\n"
+            f"  4 3 roll pop\n"
+            f"}}] setcolorspace\n"
+            f"true setoverprint"
+        )
+        
+        header = [
+            f"  {sep_code}",
+            f"  {ancho_doc} {alto_doc} scale",
+            "  <<\n    /ImageType 1",
+            f"    /Width {iw}\n    /Height {ih}\n    /BitsPerComponent 8",
+            "    /Decode [0 1]", 
+            f"    /ImageMatrix [{iw} 0 0 {-ih} 0 {ih}]",
+            "    /DataSource currentfile /ASCIIHexDecode filter\n  >>",
+            "  image"
+        ]
+
+    return header + hex_lines + [">"]
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # GENERADOR PS PRINCIPAL
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -381,6 +477,19 @@ def generar_postscript(datos: dict, imagen_path: str | None = None,
                 if not forma_ps.strip():
                     continue
 
+                textura_disp = capa.get("texturaDisp")
+                # Si hay imagen DISP, la usamos buscando su ruta.
+                disp_path = None
+                if textura_disp and isinstance(textura_disp, str):
+                    # textura_disp viene como "/textures/folder/file.png"
+                    # Asumimos que json_to_pdf corre al lado de /frontend o /api
+                    script_dir = os.path.dirname(os.path.abspath(__file__))
+                    # Reconstruye "frontend/public/textures/..."
+                    disp_path_cand = os.path.join(script_dir, "..", "frontend", "public", textura_disp.lstrip("/"))
+                    disp_path_cand = os.path.abspath(disp_path_cand)
+                    if os.path.isfile(disp_path_cand):
+                        disp_path = disp_path_cand
+
                 if preview:
                     color_block = _spot_block_preview(spot)
                     lines += [
@@ -388,21 +497,40 @@ def generar_postscript(datos: dict, imagen_path: str | None = None,
                         f"  {color_block}",
                         "  newpath",
                         forma_ps,
-                        "  f",
+                    ]
+                    if disp_path:
+                        lines += [ "  clip" ]
+                        lines += _textura_disp_ps_bloque(disp_path, ancho, alto, spot, opacidad, preview=True)
+                    else:
+                        lines += [ "  f" ]
+                    lines += [
                         "Q",
                         "",
                     ]
                 else:
-                    sep = _spot_block_ps(spot, opacidad)
-                    lines += [
-                        "q",
-                        f"  {sep}",
-                        "  newpath",
-                        forma_ps,
-                        "  f",
-                        "Q",
-                        "",
-                    ]
+                    if disp_path:
+                        lines += [
+                            "q",
+                            "  newpath",
+                            forma_ps,
+                            "  clip"
+                        ]
+                        lines += _textura_disp_ps_bloque(disp_path, ancho, alto, spot, opacidad, preview=False)
+                        lines += [
+                            "Q",
+                            "",
+                        ]
+                    else:
+                        sep = _spot_block_ps(spot, opacidad)
+                        lines += [
+                            "q",
+                            f"  {sep}",
+                            "  newpath",
+                            forma_ps,
+                            "  f",
+                            "Q",
+                            "",
+                        ]
 
     # ── Imagen base ───────────────────────────────────────────────────────────
     if imagen_path:

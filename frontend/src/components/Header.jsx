@@ -34,11 +34,11 @@ export function Header({ theme, toggleTheme }) {
       const data = await res.json()
       setProyecto({
         proyectoId: data.id,
-        nombre:     data.nombre,
-        imagenUrl:  localUrl,
-        ancho:      data.documento.ancho,
-        alto:       data.documento.alto,
-        capas:      data.capas,
+        nombre: data.nombre,
+        imagenUrl: localUrl,
+        ancho: data.documento.ancho,
+        alto: data.documento.alto,
+        capas: data.capas,
       })
     } catch (err) {
       setError(err.message)
@@ -64,9 +64,9 @@ export function Header({ theme, toggleTheme }) {
         throw new Error(err.detail ?? 'Error al generar el PDF')
       }
       const blob = await res.blob()
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement('a')
-      a.href     = url
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
       a.download = `${proyectoNombre || 'proyecto'}_spots.pdf`
       a.click()
       URL.revokeObjectURL(url)
@@ -98,32 +98,35 @@ export function Header({ theme, toggleTheme }) {
       {/* Acciones centrales */}
       <div className="flex items-center gap-2">
 
-        {/* Subir imagen */}
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={cargando}
-          className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium border border-border-light
-            bg-surface-elevated text-secondary hover:bg-surface-hover hover:text-primary hover:border-border-strong
-            transition-all duration-200 disabled:opacity-50 cursor-pointer"
-        >
-          {cargando ? (
-            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-            </svg>
-          ) : (
-            <Upload size={15} />
-          )}
-          {cargando ? 'Detectando...' : imagenUrl ? 'Cambiar imagen' : 'Subir imagen'}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="hidden"
-          onChange={handleImageUpload}
-        />
-
+        {/* Cambiar imagen (solo visible si ya hay una imagen) */}
+        {imagenUrl && (
+          <>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={cargando}
+              className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium border border-border-light
+                bg-surface-elevated text-secondary hover:bg-surface-hover hover:text-primary hover:border-border-strong
+                transition-all duration-200 disabled:opacity-50 cursor-pointer"
+            >
+              {cargando ? (
+                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              ) : (
+                <Upload size={15} />
+              )}
+              {cargando ? 'Detectando...' : 'Cambiar imagen'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={handleImageUpload}
+            />
+          </>
+        )}
         {/* Ajustes detección */}
         <DetectionSettings />
 
@@ -139,8 +142,8 @@ export function Header({ theme, toggleTheme }) {
           >
             {exportandoPDF ? (
               <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
             ) : (
               <FileDown size={15} />

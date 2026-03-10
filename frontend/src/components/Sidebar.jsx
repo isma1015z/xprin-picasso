@@ -4,28 +4,12 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Search, Eye, EyeOff } from 'lucide-react'
 import { useStore } from '../store'
-
-// ── Texturas disponibles (importadas como rutas estáticas) ─────────────────
-const TEXTURES = [
-  {
-    id: 'water-droplets',
-    name: 'Water Droplets',
-    thumb: '/textures/WaterDropletsMixedBubbled001/WaterDropletsMixedBubbled001_COL_2K.jpg',
-    style: {},
-  },
-  { id: 'gradient-1', name: 'Cuero',       style: { background: 'linear-gradient(to bottom right, #a88d75, #755f4d)' } },
-  { id: 'gradient-2', name: 'Amatista',    style: { background: 'linear-gradient(to bottom right, #4A00E0, #8E2DE2)' } },
-  { id: 'gradient-3', name: 'Oceano',      style: { background: 'linear-gradient(135deg, #667db6, #0082c8, #667db6)' } },
-  { id: 'gradient-4', name: 'Fuego',       style: { background: 'linear-gradient(to right, #f12711, #f5af19)' } },
-  { id: 'gradient-5', name: 'Esmeralda',   style: { background: 'linear-gradient(to bottom right, #11998e, #38ef7d)' } },
-  { id: 'gradient-6', name: 'Titanio',     style: { background: 'linear-gradient(135deg, #434343, #000000)' } },
-  { id: 'gradient-7', name: 'Lavanda',     style: { background: 'linear-gradient(to right, #c471ed, #f64f59)' } },
-]
+import { TEXTURES } from '../textures'
 
 const SPOTS = [
-  { value: null,      label: 'CMYK',    color: '#868e96' },
-  { value: 'w1',      label: 'W1',      color: '#a0a0ab' },
-  { value: 'w2',      label: 'W2',      color: '#7b8cde' },
+  { value: null, label: 'CMYK', color: '#868e96' },
+  { value: 'w1', label: 'W1', color: '#a0a0ab' },
+  { value: 'w2', label: 'W2', color: '#7b8cde' },
   { value: 'texture', label: 'TEXTURE', color: '#f0b429' },
 ]
 
@@ -64,8 +48,8 @@ function SpotBadge({ spot }) {
       className="text-[11px] px-2 py-0.5 rounded-full font-medium shrink-0"
       style={{
         background: s.color + '22',
-        color:      s.color,
-        border:     `1px solid ${s.color}55`,
+        color: s.color,
+        border: `1px solid ${s.color}55`,
       }}
     >
       {s.label}
@@ -75,12 +59,13 @@ function SpotBadge({ spot }) {
 
 // ── Sidebar principal ──────────────────────────────────────────────────────
 export function Sidebar() {
-  const { capas, capaActivaId, setCapaActiva, asignarSpot, toggleVisible } = useStore()
+  const { capas, capaActivaId, setCapaActiva, asignarSpot, toggleVisible, asignarTextura } = useStore()
   const [texSearch, setTexSearch] = useState('')
   const filteredTex = TEXTURES.filter((t) =>
     t.name.toLowerCase().includes(texSearch.toLowerCase())
   )
   const spotCount = capas.filter((c) => c.spot !== null).length
+  const capaActiva = capas.find(c => c.id === capaActivaId)
 
   return (
     <aside className="w-[280px] bg-surface border-r border-border-strong flex flex-col overflow-y-auto shadow-[2px_0_8px_rgba(0,0,0,0.08)] shrink-0">
@@ -179,25 +164,30 @@ export function Sidebar() {
         </div>
 
         <div className="grid grid-cols-3 gap-2 mt-1">
-          {filteredTex.map((tex) => (
-            <button
-              key={tex.id}
-              title={tex.name}
-              className="h-[52px] rounded-md cursor-pointer border border-border-light
-                transition-all duration-200 hover:scale-105 hover:shadow-md
-                overflow-hidden bg-surface-elevated"
-              style={tex.thumb ? {} : tex.style}
-            >
-              {tex.thumb && (
-                <img
-                  src={tex.thumb}
-                  alt={tex.name}
-                  className="w-full h-full object-cover"
-                  draggable={false}
-                />
-              )}
-            </button>
-          ))}
+          {filteredTex.map((tex) => {
+            const isSelected = capaActiva?.spot === 'texture' && capaActiva?.texturaId === tex.id
+            return (
+              <button
+                key={tex.id}
+                title={tex.name}
+                onClick={() => {
+                  if (capaActivaId) asignarTextura(capaActivaId, tex.id, tex.disp)
+                }}
+                className={`h-[52px] rounded-md cursor-pointer border transition-all duration-200 hover:scale-105 hover:shadow-md overflow-hidden bg-surface-elevated
+                  ${isSelected ? 'border-accent ring-2 ring-accent shadow-md' : 'border-border-light'}`}
+                style={tex.thumb ? {} : tex.style}
+              >
+                {tex.thumb && (
+                  <img
+                    src={tex.thumb}
+                    alt={tex.name}
+                    className="w-full h-full object-cover"
+                    draggable={false}
+                  />
+                )}
+              </button>
+            )
+          })}
         </div>
 
         {filteredTex.length === 0 && (

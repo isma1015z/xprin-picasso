@@ -162,7 +162,7 @@ El frontend corre en `http://localhost:5173` y hace proxy de `/api/*` al backend
 Copiar las texturas al directorio `public` del frontend:
 
 ```
-frontend/public/textures/WaterDropletsMixedBubbled001/WaterDropletsMixedBubbled001_COL_2K.jpg
+frontend/public/textures/WaterDropletsMixedBubbled001_ALPHAMASKED_2K.png
 ```
 
 ---

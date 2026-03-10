@@ -48,6 +48,17 @@ export const useStore = create((set, get) => ({
   asignarSpot: (capaId, spot) =>
     set((s) => ({ capas: s.capas.map((c) => c.id === capaId ? { ...c, spot } : c) })),
 
+
+  // ── Asignar textura ────────────────────────────────────────────────────────
+  asignarTextura: (capaId, texturaId, texturaDisp) =>
+    set((s) => ({
+      // 1. Asignar spot 'texture' a la capa
+      capas: s.capas.map((c) =>
+        // 2. Si la capa ya tiene un spot, lo quitamos
+        c.id === capaId ? { ...c, spot: 'texture', texturaId, texturaDisp } : c
+      ),
+    })),
+
   toggleVisible: (capaId) =>
     set((s) => ({ capas: s.capas.map((c) => c.id === capaId ? { ...c, visible: !c.visible } : c) })),
 
