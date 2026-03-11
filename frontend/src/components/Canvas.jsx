@@ -57,7 +57,7 @@ export function Canvas() {
   const fileInputRef = useRef(null)
   const {
     imagenUrl, imagenSize, capas, capaActivaId,
-    cargando, setProyecto, setCargando, setError, buildDetectionForm,
+    cargando, setProyecto, setCargando, setError, setCapaActiva, buildDetectionForm,
   } = useStore()
 
   const { ancho, alto } = imagenSize
@@ -275,6 +275,33 @@ export function Canvas() {
                     strokeDasharray="5 2.5"
                   />
                 ))}
+            </svg>
+
+            {/* Capa invisible para seleccionar capa por click en su color/zona */}
+            <svg
+              style={{
+                position: 'absolute',
+                top: 0, left: 0,
+                width: ancho, height: alto,
+                overflow: 'visible',
+              }}
+              viewBox={`0 0 ${ancho} ${alto}`}
+            >
+              {capas
+                .filter((c) => c.visible)
+                .map((capa) =>
+                  capa.zonas.map((zona) => (
+                    <path
+                      key={`hit-${capa.id}-${zona.id}`}
+                      d={formaToSVGPath(zona.forma, alto)}
+                      fill="transparent"
+                      stroke="transparent"
+                      strokeWidth={6}
+                      style={{ cursor: 'pointer', pointerEvents: 'all' }}
+                      onClick={() => setCapaActiva(capa.id)}
+                    />
+                  ))
+                )}
             </svg>
           </div>
         </TransformComponent>
