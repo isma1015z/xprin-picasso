@@ -1,78 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-base: var(--bg-base);
-  --color-surface: var(--bg-surface);
+  /* ── Brand XPRIN (Landing / Login / Registro) ──────────────────────── */
+  --color-brand-red:    #E41C24;
+  --color-brand-white:  #FFFFFF;
+  --color-brand-gray:   #E5E5E5;
+  --color-brand-dark:   #333333;
+  --color-brand-carbon: #4A4A4A;
+  --color-brand-cyan:   #0085C8;
+
+  /* ── Editor tokens (mapeados a CSS vars del tema dark/light) ────────── */
+  --color-base:             var(--bg-base);
+  --color-surface:          var(--bg-surface);
   --color-surface-elevated: var(--bg-surface-elevated);
-  --color-surface-hover: var(--bg-surface-hover);
+  --color-surface-hover:    var(--bg-surface-hover);
+  --color-primary:          var(--text-primary);
+  --color-secondary:        var(--text-secondary);
+  --color-muted:            var(--text-muted);
+  --color-accent:           var(--accent-primary);
+  --color-accent-hover:     var(--accent-primary-hover);
+  --color-border-light:     var(--border-light);
+  --color-border-strong:    var(--border-strong);
+  --color-canvas:           var(--canvas-bg);
+  --color-canvas-board:     var(--canvas-board);
 
-  --color-primary: var(--text-primary);
-  --color-secondary: var(--text-secondary);
-  --color-muted: var(--text-muted);
-
-  --color-accent: var(--accent-primary);
-  --color-accent-hover: var(--accent-primary-hover);
-
-  --color-border-light: var(--border-light);
-  --color-border-strong: var(--border-strong);
-
-  --color-canvas: var(--canvas-bg);
-  --color-canvas-board: var(--canvas-board);
-
-  --font-inter: 'Inter', sans-serif;
+  /* ── Fuentes ─────────────────────────────────────────────────────────── */
+  --font-sans:   'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --font-inter:  'Inter', sans-serif;
   --font-outfit: 'Outfit', sans-serif;
+
+  /* ── Animaciones ─────────────────────────────────────────────────────── */
+  @keyframes shimmer {
+    0%   { transform: translateX(-150%) skewX(-25deg); }
+    100% { transform: translateX(250%)  skewX(-25deg); }
+  }
+
+  @keyframes fade-in-up {
+    0%   { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0);    }
+  }
+
+  --animate-shimmer:     shimmer 2.5s infinite;
+  --animate-fade-in-up:  fade-in-up 0.8s ease-out forwards;
 }
 
+/* ── Tema claro (editor) ───────────────────────────────────────────────── */
 :root {
-  --bg-base: #f4f5f7;
-  --bg-surface: #ffffff;
+  --bg-base:             #f4f5f7;
+  --bg-surface:          #ffffff;
   --bg-surface-elevated: #f8f9fa;
-  --bg-surface-hover: #f0f2f5;
+  --bg-surface-hover:    #f0f2f5;
 
-  --text-primary: #1a1b1e;
+  --text-primary:   #1a1b1e;
   --text-secondary: #4a4b50;
-  --text-muted: #868e96;
+  --text-muted:     #868e96;
 
-  --accent-primary: #e63946;
+  --accent-primary:       #e63946;
   --accent-primary-hover: #c92a37;
 
-  --border-light: rgba(0, 0, 0, 0.08);
+  --border-light:  rgba(0, 0, 0, 0.08);
   --border-strong: rgba(0, 0, 0, 0.15);
 
-  --canvas-bg: #ffffff;
+  --canvas-bg:    #ffffff;
   --canvas-board: #e9ecef;
 }
 
+/* ── Tema oscuro (editor) ──────────────────────────────────────────────── */
 .dark {
-  --bg-base: #131417;
-  --bg-surface: #1e1f23;
+  --bg-base:             #131417;
+  --bg-surface:          #1e1f23;
   --bg-surface-elevated: #2a2b30;
-  --bg-surface-hover: #35373d;
+  --bg-surface-hover:    #35373d;
 
-  --text-primary: #ffffff;
+  --text-primary:   #ffffff;
   --text-secondary: #a0a0ab;
-  --text-muted: #6b6d76;
+  --text-muted:     #6b6d76;
 
-  --accent-primary: #e63946;
+  --accent-primary:       #e63946;
   --accent-primary-hover: #f04e5a;
 
-  --border-light: rgba(255, 255, 255, 0.08);
+  --border-light:  rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.15);
 
-  --canvas-bg: #e5e5e5;
+  --canvas-bg:    #e5e5e5;
   --canvas-board: #111111;
 }
 
 @layer base {
   body {
-    @apply bg-base text-primary font-inter antialiased overflow-hidden m-0 p-0 box-border;
+    @apply bg-base text-primary antialiased m-0 p-0 box-border;
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-outfit;
   }
 
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar       { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { @apply bg-surface; }
   ::-webkit-scrollbar-thumb { @apply bg-surface-elevated rounded-full; }
   ::-webkit-scrollbar-thumb:hover { @apply bg-muted; }
