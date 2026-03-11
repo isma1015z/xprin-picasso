@@ -17,6 +17,8 @@ export const useStore = create((set, get) => ({
   capas:          [],
   capaActivaId:   null,
 
+  lastFile:      null,   // File object del último upload — para re-detección
+
   settings:      { ...DEFAULT_SETTINGS },
   settingsOpen:  false,
   cargando:      false,
@@ -36,13 +38,14 @@ export const useStore = create((set, get) => ({
       errorMsg: null,
     }),
 
-  setCapaActiva:   (id)   => set({ capaActivaId: id }),
-  setSetting:      (k, v) => set((s) => ({ settings: { ...s.settings, [k]: v } })),
-  resetSettings:   ()     => set({ settings: { ...DEFAULT_SETTINGS } }),
-  setCargando:     (v)    => set({ cargando: v }),
-  setExportandoPDF:(v)    => set({ exportandoPDF: v }),
-  setError:        (msg)  => set({ errorMsg: msg }),
-  setSettingsOpen: (v)    => set({ settingsOpen: v }),
+  setCapaActiva:    (id)   => set({ capaActivaId: id }),
+  setSetting:       (k, v) => set((s) => ({ settings: { ...s.settings, [k]: v } })),
+  resetSettings:    ()     => set({ settings: { ...DEFAULT_SETTINGS } }),
+  setCargando:      (v)    => set({ cargando: v }),
+  setExportandoPDF: (v)    => set({ exportandoPDF: v }),
+  setError:         (msg)  => set({ errorMsg: msg }),
+  setSettingsOpen:  (v)    => set({ settingsOpen: v }),
+  setLastFile:      (file) => set({ lastFile: file }),
 
   asignarSpot: (capaId, spot) =>
     set((s) => ({
@@ -51,9 +54,6 @@ export const useStore = create((set, get) => ({
       ),
     })),
 
-  // ── Asignar textura ───────────────────────────────────────────────────────
-  // Asigna spot 'texture' a la capa Y guarda texturaId + texturaDisp.
-  // Si la capa ya tiene otro spot, lo sobreescribe.
   asignarTextura: (capaId, texturaId, texturaDisp) =>
     set((s) => ({
       capas: s.capas.map((c) =>
@@ -63,7 +63,6 @@ export const useStore = create((set, get) => ({
       ),
     })),
 
-  // Modificar capas con un grosor
   asignarReliefLayer: (capaId, reliefLayers) =>
     set((s) => ({
       capas: s.capas.map((c) =>
@@ -81,7 +80,7 @@ export const useStore = create((set, get) => ({
   resetEditor: () => set({
     proyectoId: null, proyectoNombre: '', imagenUrl: null,
     imagenSize: { ancho: 0, alto: 0 }, capas: [], capaActivaId: null,
-    cargando: false, errorMsg: null, exportandoPDF: false,
+    cargando: false, errorMsg: null, exportandoPDF: false, lastFile: null,
   }),
 
   getProyectoJSON: () => {
