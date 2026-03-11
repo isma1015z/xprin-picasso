@@ -97,7 +97,8 @@ export function DetectionSettings() {
       </button>
 
       {settingsOpen && (
-        <div className="absolute top-full left-0 mt-1.5 z-50 w-72 bg-surface rounded-xl shadow-2xl border border-border-strong overflow-hidden">
+        <div className="absolute top-full left-0 mt-1.5 z-50 w-72 bg-surface rounded-xl shadow-2xl border border-border-strong overflow-hidden
+          max-md:left-auto max-md:right-0 max-md:w-[min(92vw,22rem)]">
 
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border-light bg-surface-elevated">
