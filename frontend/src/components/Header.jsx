@@ -17,6 +17,8 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
     getProyectoJSON, proyectoNombre, setProyectoNombre, buildDetectionForm,
   } = useStore()
 
+  const logoSrc = theme === 'dark' ? lapizBlanco : lapiz
+
   // ── Subir imagen ──────────────────────────────────────────────────────────
   async function handleImageUpload(e) {
     const file = e.target.files?.[0]
