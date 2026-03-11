@@ -6,12 +6,16 @@ import textureBg from '../assets/images/texture-200.png';
 import videoprueba from '../assets/images/videoprueba.mp4';
 import videoXp from '../assets/images/videoxp_6206.mp4';
 import prueba2 from '../assets/images/prueba2.jpg';
+import logoBlanco from '../assets/images/Logo_Blanco.png';
+import logoColor from '../assets/images/Picsart_26-03-10_10-02-37-011.png';
 
 export function Registro() {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
+    phone: '',
     company: '',
+    address: '',
     password: '',
     confirmPassword: '',
     isSubscribed: false
@@ -154,12 +158,9 @@ export function Registro() {
                 setIsPrinting(true);
                 setTimeout(() => navigate('/'), 1500);
               }}
-              className="inline-flex items-center gap-3 group hover:opacity-90 transition-opacity cursor-pointer bg-brand-dark/5 p-2 rounded-lg"
+              className="inline-flex items-center group hover:opacity-90 transition-opacity cursor-pointer bg-brand-dark/5 p-2 rounded-lg"
             >
-              <div className="w-10 h-10 bg-brand-red rounded-sm flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                <span className="text-brand-white font-bold text-xl">X</span>
-              </div>
-              <span className="text-2xl font-black text-brand-white tracking-tight drop-shadow-md">XPRIN</span>
+              <img src={logoBlanco} alt="XPRIN Logo" className="h-12 w-auto object-contain group-hover:scale-105 transition-transform" />
             </div>
           </div>
 
@@ -187,12 +188,9 @@ export function Registro() {
                 setIsPrinting(true);
                 setTimeout(() => navigate('/'), 1500);
               }}
-              className="flex lg:hidden items-center gap-3 mb-8 group cursor-pointer"
+              className="flex lg:hidden items-center mb-8 group cursor-pointer"
             >
-              <div className="w-10 h-10 bg-brand-red rounded-sm flex items-center justify-center group-hover:scale-105 transition-transform shadow-lg shadow-brand-red/20">
-                <span className="text-brand-white font-bold text-xl">X</span>
-              </div>
-              <span className="text-2xl font-black text-brand-dark tracking-tight">XPRIN</span>
+              <img src={logoColor} alt="XPRIN Logo" className="h-10 w-auto object-contain group-hover:scale-105 transition-transform" />
             </Link>
 
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-brand-dark mt-3 lg:mt-0 mb-1">
@@ -242,6 +240,25 @@ export function Registro() {
               </div>
 
               <div className="group">
+                <label htmlFor="phone" className="block text-xs font-bold text-brand-carbon/60 uppercase tracking-widest mb-2 transition-colors group-focus-within:text-brand-red">
+                  Número de teléfono
+                </label>
+                <div className="relative">
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    required
+                    placeholder="+34 600 000 000"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none sm:text-sm sm:leading-6"
+                  />
+                  <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
+                </div>
+              </div>
+
+              <div className="group">
                 <label htmlFor="company" className="block text-xs font-bold text-brand-carbon/60 uppercase tracking-widest mb-2 transition-colors group-focus-within:text-brand-red">
                   Empresa / Organización
                 </label>
@@ -253,6 +270,25 @@ export function Registro() {
                     required
                     placeholder="XPRIN Solutions"
                     value={formData.company}
+                    onChange={handleChange}
+                    className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none sm:text-sm sm:leading-6"
+                  />
+                  <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
+                </div>
+              </div>
+
+              <div className="group">
+                <label htmlFor="address" className="block text-xs font-bold text-brand-carbon/60 uppercase tracking-widest mb-2 transition-colors group-focus-within:text-brand-red">
+                  Dirección de la empresa (Calle)
+                </label>
+                <div className="relative">
+                  <input
+                    id="address"
+                    name="address"
+                    type="text"
+                    required
+                    placeholder="Calle de la Innovación, N° 45"
+                    value={formData.address}
                     onChange={handleChange}
                     className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none sm:text-sm sm:leading-6"
                   />

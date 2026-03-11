@@ -9,9 +9,10 @@ import prueba2 from '../assets/images/prueba2.jpg';
 import logoBlanco from '../assets/images/Logo_Blanco.png';
 import logoColor from '../assets/images/Picsart_26-03-10_10-02-37-011.png';
 
-export function Login() {
+export function RecuperarContrasena() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const video1Ref = useRef(null);
@@ -52,18 +53,21 @@ export function Login() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Login attempt:', { email, password });
-  };
-
-  const handleRegisterClick = (e) => {
-    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      alert("Las contraseñas no coinciden");
+      return;
+    }
+    console.log('Password reset attempt:', { email, newPassword });
+    
+    // Activa la transición
     setIsPrinting(true);
-
-    // Simula el tiempo de "impresión" antes de navegar
+    
+    // Simula éxito y redirecciona tras la animación
     setTimeout(() => {
-      navigate('/registro');
-    }, 1500); // 1.5s
+       navigate('/login');
+    }, 1500);
   };
+
 
   return (
     <>
@@ -153,13 +157,13 @@ export function Login() {
 
           <div className="relative z-10 p-12 mt-auto">
             <h1 className="text-4xl lg:text-5xl font-extrabold text-brand-white leading-tight mb-2 drop-shadow-md">
-              Soluciones de impresión de alta precisión.
+              Recupera tu acceso corporativo.
             </h1>
             <p className="text-xl font-semibold text-brand-cyan mb-4 tracking-wide drop-shadow-md">
-              Marcamos la diferencia
+              Seguridad corporativa garantizada
             </p>
             <p className="text-lg text-brand-gray max-w-md opacity-90 drop-shadow-md">
-              Gestiona tus proyectos, revisa tus pedidos y accede a nuestra plataforma de producción centralizada.
+              Restablece tu contraseña para volver a gestionar tus proyectos, revisar tus pedidos y acceder a nuestra plataforma.
             </p>
           </div>
         </div>
@@ -179,10 +183,10 @@ export function Login() {
             </div>
 
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-brand-dark mt-2 lg:mt-0 mb-1">
-              Acceso al portal
+              Restablecer contraseña
             </h2>
             <p className="text-xs sm:text-sm text-brand-carbon/60 font-medium mb-8 sm:mb-10">
-              Credenciales corporativas de alta seguridad
+              Ingresa tu correo y nueva contraseña segura
             </p>
 
             <form className="space-y-6" onSubmit={handleSubmit}>
@@ -208,53 +212,46 @@ export function Login() {
                 </div>
               </div>
 
-              {/* Form Group para Contraseña con recuperación de acceso */}
+              {/* Form Group para Nueva Contraseña */}
               <div className="group">
-                <div className="flex items-center justify-between mb-2">
-                  <label htmlFor="password" className="block text-xs font-bold text-brand-carbon/60 uppercase tracking-widest transition-colors group-focus-within:text-brand-red">
-                    Contraseña
-                  </label>
-                  <div className="text-xs">
-                    <Link 
-                      to="/recuperar"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setIsPrinting(true);
-                        setTimeout(() => navigate('/recuperar'), 1500);
-                      }}
-                      className="font-bold text-brand-cyan hover:text-brand-red transition-colors uppercase tracking-tighter"
-                    >
-                      ¿Olvidaste tu contraseña?
-                    </Link>
-                  </div>
-                </div>
+                <label htmlFor="newPassword" className="block text-xs font-bold text-brand-carbon/60 uppercase tracking-widest mb-2 transition-colors group-focus-within:text-brand-red">
+                  Nueva Contraseña
+                </label>
                 <div className="relative">
                   <input
-                    id="password"
-                    name="password"
+                    id="newPassword"
+                    name="newPassword"
                     type="password"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     required
                     placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
                     className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 sm:py-4 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none text-sm sm:leading-6"
                   />
                   <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
                 </div>
               </div>
 
-              {/* Opciones de sesión persistente */}
-              <div className="flex items-center gap-2 py-2">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-brand-gray/50 text-brand-red focus:ring-brand-red cursor-pointer accent-brand-red"
-                />
-                <label htmlFor="remember-me" className="text-xs font-bold text-brand-carbon/60 uppercase tracking-tighter cursor-pointer select-none">
-                  Mantener sesión iniciada
+              {/* Form Group para Confirmar Contraseña */}
+              <div className="group">
+                <label htmlFor="confirmPassword" className="block text-xs font-bold text-brand-carbon/60 uppercase tracking-widest mb-2 transition-colors group-focus-within:text-brand-red">
+                  Confirmar Contraseña
                 </label>
+                <div className="relative">
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 sm:py-4 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none text-sm sm:leading-6"
+                  />
+                  <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
+                </div>
               </div>
 
               {/* Botón Principal con Efecto Shimmer (Brillo recorriendo el fondo) */}
@@ -262,20 +259,24 @@ export function Login() {
                 type="submit"
                 className="group relative flex w-full justify-center rounded-sm bg-brand-red px-3 py-4 text-sm font-bold text-brand-white shadow-xl shadow-brand-red/20 overflow-hidden transition-all hover:scale-[1.02] active:scale-[0.98] outline-none"
               >
-                <span className="relative z-10 tracking-widest">ACCEDER A LA PLATAFORMA</span>
+                <span className="relative z-10 tracking-widest">RESTABLECER CONTRASEÑA</span>
                 <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] -translate-x-full group-hover:animate-shimmer"></div>
               </button>
             </form>
 
             <div className="mt-10 text-center text-sm text-brand-carbon opacity-80">
-              ¿No tienes cuenta corporativa?{' '}
-              <a
-                href="/registro"
-                onClick={handleRegisterClick}
+              ¿Recordaste tu contraseña?{' '}
+              <Link
+                to="/login"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setIsPrinting(true);
+                  setTimeout(() => navigate('/login'), 1500);
+                }}
                 className="font-semibold leading-6 text-brand-cyan hover:opacity-80 transition-colors"
               >
-                Solicita acceso aquí
-              </a>
+                Volver al acceso
+              </Link>
             </div>
           </div>
         </div>
