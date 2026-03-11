@@ -1,9 +1,10 @@
-// Sidebar — Capas por color · Texturas · Spots UV
+// Sidebar — Capas por color · Spots UV
 
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Search, Eye, EyeOff } from 'lucide-react'
+import { ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { useStore } from '../store'
 import { TEXTURES } from '../textures'
+import { TextureModal } from './TextureModal'
 
 const SPOTS = [
   { value: null,      label: 'CMYK',    color: '#868e96' },
@@ -12,7 +13,7 @@ const SPOTS = [
   { value: 'texture', label: 'TEXTURE', color: '#f0b429' },
 ]
 
-// ── Accordion ─────────────────────────────────────────────────────────────
+// ── Accordion ──────────────────────────────────────────────────────────────
 function AccordionItem({ title, badge, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
@@ -63,208 +64,191 @@ export function Sidebar() {
     setCapaActiva, asignarSpot, asignarTextura, asignarReliefLayer, toggleVisible,
   } = useStore()
 
-  const [texSearch, setTexSearch] = useState('')
+  const [modalTextura, setModalTextura] = useState(null)
 
-  const filteredTex = TEXTURES.filter((t) =>
-    t.name.toLowerCase().includes(texSearch.toLowerCase())
-  )
+  const spotCount = capas.filter((c) => c.spot !== null).length
 
-  const spotCount  = capas.filter((c) => c.spot !== null).length
-  const capaActiva = capas.find((c) => c.id === capaActivaId)
+  function handleSpotChange(capaId, value) {
+    const spot = value === '' ? null : value
+    if (spot === 'texture') {
+      const capa = capas.find((c) => c.id === capaId)
+      setModalTextura({ capaId, capaColor: capa?.color || '#f0b429' })
+      asignarSpot(capaId, 'texture')
+    } else {
+      asignarSpot(capaId, spot)
+    }
+  }
+
+  function handleTexturaSelect(capaId, texturaId, texturaDisp) {
+    asignarTextura(capaId, texturaId, texturaDisp)
+    setModalTextura(null)
+  }
 
   return (
-    <aside className="w-[280px] bg-surface border-r border-border-strong flex flex-col overflow-y-auto shadow-[2px_0_8px_rgba(0,0,0,0.08)] shrink-0">
+    <>
+      <aside className="w-[280px] bg-surface border-r border-border-strong flex flex-col overflow-y-auto shadow-[2px_0_8px_rgba(0,0,0,0.08)] shrink-0">
 
-      {/* ── CAPAS ─────────────────────────────────────────────────────────── */}
-      <AccordionItem
-        title="Capas por color"
-        badge={capas.length > 0 ? `${spotCount}/${capas.length}` : null}
-      >
-        {capas.length === 0 && (
-          <p className="text-secondary text-[13px]">
-            Sube una imagen para ver las capas detectadas.
-          </p>
-        )}
+        {/* ── CAPAS ───────────────────────────────────────────────────────── */}
+        <AccordionItem
+          title="Capas por color"
+          badge={capas.length > 0 ? `${spotCount}/${capas.length}` : null}
+        >
+          {capas.length === 0 && (
+            <p className="text-secondary text-[13px]">
+              Sube una imagen para ver las capas detectadas.
+            </p>
+          )}
 
-        <ul className="flex flex-col gap-1 list-none m-0 p-0">
-          {capas.map((capa) => {
-            const isActive = capa.id === capaActivaId
-            return (
-              <li
-                key={capa.id}
-                onClick={() => setCapaActiva(capa.id)}
-                className={`rounded-lg p-2.5 cursor-pointer transition-all duration-150
-                  ${isActive ? 'bg-accent/8 ring-1 ring-accent/30' : 'hover:bg-surface-hover'}`}
-              >
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-4 h-4 rounded-sm shrink-0 border border-black/10"
-                    style={{ background: capa.color }}
-                  />
-                  <span className="text-[13px] text-primary font-medium flex-1 truncate">
-                    {capa.nombre}
-                  </span>
-                  <span className="text-[11px] text-muted shrink-0">
-                    {(capa.area_px / 1000).toFixed(1)}k
-                  </span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleVisible(capa.id) }}
-                    className="text-muted hover:text-primary transition-colors shrink-0"
-                    title={capa.visible ? 'Ocultar' : 'Mostrar'}
-                  >
-                    {capa.visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                  </button>
-                </div>
+          <ul className="flex flex-col gap-1 list-none m-0 p-0">
+            {capas.map((capa) => {
+              const isActive = capa.id === capaActivaId
+              const tex = capa.spot === 'texture' && capa.texturaId
+                ? TEXTURES.find((t) => t.id === capa.texturaId)
+                : null
 
-                {/* Selector spot */}
-                <div className="mt-2 flex items-center gap-1.5">
-                  <select
-                    value={capa.spot ?? ''}
-                    onChange={(e) => {
-                      e.stopPropagation()
-                      asignarSpot(capa.id, e.target.value === '' ? null : e.target.value)
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex-1 text-[12px] border border-border-light rounded-md px-2 py-1
-                      bg-surface-elevated text-primary outline-none transition-colors
-                      focus:border-accent focus:ring-1 focus:ring-accent/30 cursor-pointer"
-                  >
-                    {SPOTS.map((s) => (
-                      <option key={s.value ?? 'null'} value={s.value ?? ''}>{s.label}</option>
-                    ))}
-                  </select>
-                  <SpotBadge spot={capa.spot} />
-                </div>
+              return (
+                <li
+                  key={capa.id}
+                  onClick={() => setCapaActiva(capa.id)}
+                  className={`rounded-lg p-2.5 cursor-pointer transition-all duration-150
+                    ${isActive ? 'bg-accent/8 ring-1 ring-accent/30' : 'hover:bg-surface-hover'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 rounded-sm shrink-0 border border-black/10"
+                      style={{ background: capa.color }}
+                    />
+                    <span className="text-[13px] text-primary font-medium flex-1 truncate">
+                      {capa.nombre}
+                    </span>
+                    <span className="text-[11px] text-muted shrink-0">
+                      {(capa.area_px / 1000).toFixed(1)}k
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleVisible(capa.id) }}
+                      className="text-muted hover:text-primary transition-colors shrink-0"
+                      title={capa.visible ? 'Ocultar' : 'Mostrar'}
+                    >
+                      {capa.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                    </button>
+                  </div>
 
-                {/* Textura asignada */}
-                {capa.spot === 'texture' && capa.texturaId && (() => {
-                  const tex = TEXTURES.find((t) => t.id === capa.texturaId)
-                  return tex ? (
-                    <div className="mt-1.5 flex items-center gap-1.5">
-                      <div
-                        className="w-5 h-5 rounded-sm overflow-hidden border border-border-light shrink-0"
-                        style={tex.thumb ? {} : tex.style}
-                      >
-                        {tex.thumb && (
-                          <img src={tex.thumb} alt={tex.name} className="w-full h-full object-cover" />
-                        )}
-                      </div>
-                      <span className="text-[11px] text-muted truncate">{tex.name}</span>
-                    </div>
-                  ) : null
-                })()}
-
-                {/* Submenú Tamaño (reliefLayers) visible si hay un spot asignado (especialmente TEXTURE o W1/W2) */}
-                {capa.spot && (
-                  <div className="mt-2 flex items-center justify-between border-t border-border-light pt-2">
-                    <span className="text-[12px] text-muted">Ajuste de grosor</span>
+                  {/* Selector spot */}
+                  <div className="mt-2 flex items-center gap-1.5">
                     <select
-                      value={capa.reliefLayers || 10}
+                      value={capa.spot ?? ''}
                       onChange={(e) => {
                         e.stopPropagation()
-                        asignarReliefLayer(capa.id, parseInt(e.target.value, 10))
+                        handleSpotChange(capa.id, e.target.value)
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[12px] border border-border-light rounded-md px-2 py-1
+                      className="flex-1 text-[12px] border border-border-light rounded-md px-2 py-1
                         bg-surface-elevated text-primary outline-none transition-colors
                         focus:border-accent focus:ring-1 focus:ring-accent/30 cursor-pointer"
                     >
-                      <option value={10}>10 Pasadas</option>
-                      <option value={20}>20 Pasadas</option>
-                      <option value={30}>30 Pasadas</option>
+                      {SPOTS.map((s) => (
+                        <option key={s.value ?? 'null'} value={s.value ?? ''}>{s.label}</option>
+                      ))}
                     </select>
+                    <SpotBadge spot={capa.spot} />
                   </div>
-                )}
 
-                <div className="mt-1 text-[11px] text-muted">
-                  {capa.zonas.length} zona{capa.zonas.length !== 1 ? 's' : ''}
+                  {/* Textura asignada — chip clicable para reabrir modal */}
+                  {capa.spot === 'texture' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setModalTextura({ capaId: capa.id, capaColor: capa.color })
+                      }}
+                      className="mt-1.5 w-full flex items-center gap-1.5 rounded-md px-2 py-1
+                        border border-dashed border-border-light hover:border-accent
+                        transition-colors group"
+                      title="Cambiar textura"
+                    >
+                      {tex ? (
+                        <>
+                          <div
+                            className="w-5 h-5 rounded-sm overflow-hidden border border-border-light shrink-0"
+                            style={tex.thumb ? {} : tex.style}
+                          >
+                            {tex.thumb && (
+                              <img src={tex.thumb} alt={tex.name} className="w-full h-full object-cover" />
+                            )}
+                          </div>
+                          <span className="text-[11px] text-muted group-hover:text-primary truncate transition-colors">
+                            {tex.name}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[11px] text-muted group-hover:text-accent transition-colors w-full text-center">
+                          + Seleccionar textura
+                        </span>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Grosor — input numérico libre */}
+                  {capa.spot && (
+                    <div className="mt-2 flex items-center justify-between border-t border-border-light pt-2">
+                      <span className="text-[12px] text-muted">Ajuste de grosor</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min={1}
+                          max={999}
+                          value={capa.reliefLayers || 10}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            const v = parseInt(e.target.value, 10)
+                            if (!isNaN(v) && v >= 1) asignarReliefLayer(capa.id, v)
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-14 text-[12px] text-center border border-border-light rounded-md px-2 py-1
+                            bg-surface-elevated text-primary outline-none transition-colors
+                            focus:border-accent focus:ring-1 focus:ring-accent/30
+                            [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                        <span className="text-[11px] text-muted">pasadas</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-1 text-[11px] text-muted">
+                    {capa.zonas.length} zona{capa.zonas.length !== 1 ? 's' : ''}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </AccordionItem>
+
+        {/* ── SPOTS UV ────────────────────────────────────────────────────── */}
+        <AccordionItem title="Spots UV" defaultOpen={true}>
+          <div className="flex flex-col gap-2">
+            {SPOTS.filter((s) => s.value !== null).map((s) => {
+              const n = capas.filter((c) => c.spot === s.value).length
+              return (
+                <div key={s.value} className="flex items-center gap-2.5">
+                  <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
+                  <span className="text-[13px] text-primary flex-1">{s.label}</span>
+                  <span className="text-[11px] text-muted font-mono">{n} capa{n !== 1 ? 's' : ''}</span>
                 </div>
-              </li>
-            )
-          })}
-        </ul>
-      </AccordionItem>
+              )
+            })}
+          </div>
+        </AccordionItem>
 
-      {/* ── TEXTURAS ──────────────────────────────────────────────────────── */}
-      <AccordionItem title="Texturas" defaultOpen={false}>
+      </aside>
 
-        {/* Aviso si no hay capa activa */}
-        {!capaActivaId && (
-          <p className="text-[12px] text-muted italic">
-            Selecciona una capa para asignarle una textura.
-          </p>
-        )}
-
-        <div className="relative flex items-center">
-          <input
-            type="text"
-            placeholder="Buscar textura..."
-            value={texSearch}
-            onChange={(e) => setTexSearch(e.target.value)}
-            className="w-full py-1.5 pl-3 pr-8 rounded-full border border-border-light
-              bg-surface-elevated text-primary outline-none text-[13px]
-              transition-colors focus:border-secondary placeholder:text-muted"
-          />
-          <Search size={14} className="absolute right-2.5 text-muted pointer-events-none" />
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 mt-1">
-          {filteredTex.map((tex) => {
-            // Una textura está "activa" si la capa activa tiene ese texturaId
-            const isSelected =
-              capaActiva?.spot === 'texture' && capaActiva?.texturaId === tex.id
-
-            return (
-              <button
-                key={tex.id}
-                title={tex.name}
-                disabled={!capaActivaId}
-                onClick={() => {
-                  if (capaActivaId) asignarTextura(capaActivaId, tex.id, tex.disp)
-                }}
-                className={`h-[52px] rounded-md border transition-all duration-200 overflow-hidden
-                  bg-surface-elevated disabled:opacity-40 disabled:cursor-not-allowed
-                  ${capaActivaId ? 'cursor-pointer hover:scale-105 hover:shadow-md' : ''}
-                  ${isSelected
-                    ? 'border-accent ring-2 ring-accent shadow-md scale-105'
-                    : 'border-border-light'
-                  }`}
-                style={tex.thumb ? {} : tex.style}
-              >
-                {tex.thumb && (
-                  <img
-                    src={tex.thumb}
-                    alt={tex.name}
-                    className="w-full h-full object-cover"
-                    draggable={false}
-                  />
-                )}
-              </button>
-            )
-          })}
-        </div>
-
-        {filteredTex.length === 0 && (
-          <p className="text-muted text-[13px] text-center py-2">Sin resultados</p>
-        )}
-      </AccordionItem>
-
-      {/* ── SPOTS UV ──────────────────────────────────────────────────────── */}
-      <AccordionItem title="Spots UV" defaultOpen={true}>
-        <div className="flex flex-col gap-2">
-          {SPOTS.filter((s) => s.value !== null).map((s) => {
-            const n = capas.filter((c) => c.spot === s.value).length
-            return (
-              <div key={s.value} className="flex items-center gap-2.5">
-                <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
-                <span className="text-[13px] text-primary flex-1">{s.label}</span>
-                <span className="text-[11px] text-muted font-mono">{n} capa{n !== 1 ? 's' : ''}</span>
-              </div>
-            )
-          })}
-        </div>
-      </AccordionItem>
-
-    </aside>
+      {/* ── MODAL TEXTURAS ─────────────────────────────────────────────────── */}
+      {modalTextura && (
+        <TextureModal
+          capaId={modalTextura.capaId}
+          capaColor={modalTextura.capaColor}
+          onSelect={handleTexturaSelect}
+          onClose={() => setModalTextura(null)}
+        />
+      )}
+    </>
   )
 }
