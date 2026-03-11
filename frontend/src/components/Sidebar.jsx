@@ -60,7 +60,7 @@ function SpotBadge({ spot }) {
 export function Sidebar() {
   const {
     capas, capaActivaId,
-    setCapaActiva, asignarSpot, asignarTextura, toggleVisible,
+    setCapaActiva, asignarSpot, asignarTextura, asignarReliefLayer, toggleVisible,
   } = useStore()
 
   const [texSearch, setTexSearch] = useState('')
@@ -153,6 +153,28 @@ export function Sidebar() {
                     </div>
                   ) : null
                 })()}
+
+                {/* Submenú Tamaño (reliefLayers) visible si hay un spot asignado (especialmente TEXTURE o W1/W2) */}
+                {capa.spot && (
+                  <div className="mt-2 flex items-center justify-between border-t border-border-light pt-2">
+                    <span className="text-[12px] text-muted">Ajuste de grosor</span>
+                    <select
+                      value={capa.reliefLayers || 10}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        asignarReliefLayer(capa.id, parseInt(e.target.value, 10))
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[12px] border border-border-light rounded-md px-2 py-1
+                        bg-surface-elevated text-primary outline-none transition-colors
+                        focus:border-accent focus:ring-1 focus:ring-accent/30 cursor-pointer"
+                    >
+                      <option value={10}>10 Pasadas</option>
+                      <option value={20}>20 Pasadas</option>
+                      <option value={30}>30 Pasadas</option>
+                    </select>
+                  </div>
+                )}
 
                 <div className="mt-1 text-[11px] text-muted">
                   {capa.zonas.length} zona{capa.zonas.length !== 1 ? 's' : ''}
