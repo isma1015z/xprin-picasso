@@ -24,10 +24,11 @@ import sys
 import argparse
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageOps
     HAS_PILLOW = True
 except ImportError:
     HAS_PILLOW = False
+
 
 
 SPOTS_ORDEN = ["w1", "w2", "texture"]
@@ -135,7 +136,7 @@ def _preparar_jpeg(imagen_path):
 
 
 def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
-                       preview=False, embed_imagen=True):
+                       preview=False, embed_imagen=True, textures_data=None):
     doc   = datos["documento"]
     ancho = int(doc["ancho"])
     alto  = int(doc["alto"])
@@ -162,8 +163,104 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
     OBJ_TINT_TEX = 8
     OBJ_CONTENT  = 9
     OBJ_IMAGE    = 10
+    
+    # We will reserve object IDs dynamically for textures
+    obj_id_counter = 11
 
     TINT_IDS = {"w1": OBJ_TINT_W1, "w2": OBJ_TINT_W2, "texture": OBJ_TINT_TEX}
+
+    # ── Textures Preparation ───────────────────────────────────────────────────
+    # If a layer uses spot "texture", it has a 'texturaId'
+    # For each unique texturaId, we need to load its DISP and GLOSS images.
+    # Convert them to grayscale, save to bytes.
+    # Then create XObjects and Patterns for them.
+    texture_patterns = {} # texturaId -> {"disp_pattern_cs": name, "gloss_pattern_cs": name}
+    obj_bodies = {}
+
+    if HAS_PILLOW and textures_data:
+        used_textura_ids = set()
+        for capa in capas:
+            if capa.get("visible", True) and capa.get("spot") == "texture" and capa.get("texturaId"):
+                used_textura_ids.add(capa["texturaId"])
+                
+        # Find paths from textures_data
+        for tex_id in used_textura_ids:
+            tex_info = next((t for t in textures_data if t["id"] == tex_id), None)
+            if not tex_info: continue
+            
+            pats = {}
+            for kind, img_url in [("disp", tex_info.get("disp")), ("gloss", tex_info.get("gloss"))]:
+                if not img_url: continue
+                # img_url is like "/textures/Arcilla/Arcilla_DISP_2K.png"
+                # Strip leading slash and map to public folder
+                rel_path = img_url.lstrip("/")
+                local_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "public", rel_path)
+                
+                if os.path.isfile(local_path):
+                    with Image.open(local_path) as im:
+                        # Convert to grayscale
+                        im_gray = ImageOps.grayscale(im.convert("RGB"))
+                        w, h = im_gray.size
+                        # Max dimension for texture, don't need 2K for repeating if it's too big, but let's keep it reasonable
+                        ratio = 1.0
+                        if w > 1024 or h > 1024:
+                            ratio = min(1024 / w, 1024 / h)
+                            im_gray = im_gray.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
+                            w, h = im_gray.size
+                        
+                        buf = io.BytesIO()
+                        im_gray.save(buf, format="JPEG", quality=85)
+                        jpg_data = buf.getvalue()
+                        
+                        # Create Image XObject
+                        img_obj_id = obj_id_counter
+                        obj_id_counter += 1
+                        
+                        # Image XObject will be drawn in the pattern
+                        # We use /DeviceGray, because it's drawn inside an Uncolored Pattern
+                        # Wait, if we use Uncolored Pattern, the pattern gives the shape, but the ColorSpace applied during SCN sets the color.
+                        # But Image XObject ignores the SCN color if it's an 8-bit image with its own ColorSpace.
+                        # If the image has /ColorSpace [/Separation /TEXTURE /DeviceGray 8 0 R], it will just output to TEXTURE channel!
+                        # So we don't even need a pattern if we just want to draw an image...
+                        # BUT we want to tile it. So we must put it in a Pattern.
+                        # Wait! If the Image is explicitly in the Separation space, we can just put it inside a regular Form XObject and tile that?
+                        # Or a Colored Tiling Pattern (PaintType 1).
+                        # In PaintType 1, the pattern's stream provides the colors.
+                        # So we define the image XObject in Separation space.
+                        
+                        img_hdr = (
+                            f"<< /Type /XObject /Subtype /Image\n"
+                            f"   /Width {w} /Height {h}\n"
+                            f"   /ColorSpace [/Separation /TEXTURE /DeviceGray {OBJ_TINT_TEX} 0 R]\n"
+                            f"   /BitsPerComponent 8 /Filter /DCTDecode\n"
+                            f"   /Length {len(jpg_data)} >>\nstream\n"
+                        ).encode()
+                        obj_bodies[img_obj_id] = img_hdr + jpg_data + b"\nendstream"
+                        
+                        # Now Pattern Stream
+                        # We scale the image to a physical size. Let's say textures are 200x200 pixels physically.
+                        # Just use w, h as points? 1024 points is 14 inches.
+                        # Let's say we scale it to exactly w, h points.
+                        # The pattern will tile every w points horizontally and h points vertically.
+                        pat_stream = f"q\n{w} 0 0 {h} 0 0 cm\n/ImTex Do\nQ".encode()
+                        
+                        pat_obj_id = obj_id_counter
+                        obj_id_counter += 1
+                        
+                        pat_hdr = (
+                            f"<< /Type /Pattern /PatternType 1\n"
+                            f"   /PaintType 1 /TilingType 1\n"
+                            f"   /BBox [0 0 {w} {h}]\n"
+                            f"   /XStep {w} /YStep {h}\n"
+                            f"   /Resources << /XObject << /ImTex {img_obj_id} 0 R >> >>\n"
+                            f"   /Length {len(pat_stream)} >>\nstream\n"
+                        ).encode()
+                        obj_bodies[pat_obj_id] = pat_hdr + pat_stream + b"\nendstream"
+                        
+                        pats[kind] = pat_obj_id
+            
+            if pats:
+                texture_patterns[tex_id] = pats
 
     # ── Content stream ─────────────────────────────────────────────────────────
     cs = bytearray()
@@ -203,10 +300,35 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
 
         for capa in lista:
             opacidad = max(0.0, min(1.0, float(capa.get("opacidad", 1.0))))
+            
+            # Form path bytes
+            pb = bytearray()
             for zona in capa.get("zonas", []):
-                pb = _forma_a_pdf_bytes(zona.get("forma", []))
-                if not pb.strip():
-                    continue
+                pb += _forma_a_pdf_bytes(zona.get("forma", []))
+            if not pb.strip():
+                continue
+
+            if spot == "texture" and not preview and capa.get("texturaId") in texture_patterns:
+                # Use Pattern instead of solid color
+                pats = texture_patterns[capa.get("texturaId")]
+                
+                # DRAW DISP Pattern
+                if "disp" in pats:
+                    cs += b"q\n/GSOP gs\n"
+                    cs += f"/Pattern cs\n".encode()
+                    cs += f"/Pat{pats['disp']} scn\n".encode()
+                    cs += pb
+                    cs += b"f*\nQ\n\n"
+                    
+                # DRAW GLOSS Pattern on top of DISP (in same channel? Yes, overprints on separation)
+                if "gloss" in pats:
+                    cs += b"q\n/GSOP gs\n"
+                    cs += f"/Pattern cs\n".encode()
+                    cs += f"/Pat{pats['gloss']} scn\n".encode()
+                    cs += pb
+                    cs += b"f*\nQ\n\n"
+            else:
+                # Fallback to Solid SPOT Color
                 cs += b"q\n"
                 if not preview:
                     cs += b"/GSOP gs\n"
@@ -222,7 +344,7 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
     content_bytes = bytes(cs)
 
     # ── Objetos PDF ────────────────────────────────────────────────────────────
-    obj_bodies = {}
+    # obj_bodies may already have texture patterns
 
     # Tint function: { pop 1 }
     # pop descarta el valor de tinta, 1 deja blanco en DeviceGray.
@@ -266,12 +388,24 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
             )
 
     xobj_block = f"\n      /XObject << /Im0 {OBJ_IMAGE} 0 R >>" if jpeg_bytes else ""
+    
+    # Pattern resources
+    pat_entries = []
+    for pats in texture_patterns.values():
+        for pat_obj_id in pats.values():
+            pat_entries.append(f"      /Pat{pat_obj_id} {pat_obj_id} 0 R")
+            
+    pat_block = ""
+    if pat_entries:
+        pat_block = f"\n      /Pattern <<\n" + "\n".join(pat_entries) + "\n      >>"
 
     resources = (
         f"    /Resources <<\n"
         f"      /ExtGState << /GSOP {OBJ_GSOP} 0 R /GSNOP {OBJ_GSNOP} 0 R >>\n"
         f"      /ColorSpace <<\n" + "\n".join(cs_entries) + "\n      >>"
-        + xobj_block + "\n    >>"
+        + xobj_block
+        + pat_block
+        + "\n    >>"
     )
 
     obj_bodies[OBJ_PAGE] = (
@@ -320,9 +454,31 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
 
 def generar_pdf(datos, imagen_path, output_path, preview=False,
                 conservar_ps=False, embed_imagen=True, gs_bin=None):
+    
+    # Load textures_data to know how to map texturaId to image paths
+    textures_data = None
+    try:
+        from map_textures import textures_data as _map_textures_data
+        textures_data = _map_textures_data
+    except ImportError:
+        # Maybe we should load textures.js or JSON directly if map_textures doesn't expose it
+        pass
+        
+    # We will just parse textures.js directly since we wrote it there
+    local_tex_js = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "src", "textures.js")
+    if os.path.exists(local_tex_js):
+        with open(local_tex_js, "r", encoding="utf-8") as f:
+            content = f.read()
+            if "export const TEXTURES = " in content:
+                json_str = content.split("export const TEXTURES = ")[1].rstrip(";\n")
+                try:
+                    textures_data = json.loads(json_str)
+                except Exception:
+                    pass
+
     return generar_pdf_nativo(
         datos, imagen_path, output_path,
-        preview=preview, embed_imagen=embed_imagen,
+        preview=preview, embed_imagen=embed_imagen, textures_data=textures_data
     )
 
 
