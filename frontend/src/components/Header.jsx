@@ -98,18 +98,18 @@ export function Header({ theme, toggleTheme }) {
     /* Agregué 'relative' al contenedor principal del header */
     <header className="flex items-center justify-between h-[60px] px-6 bg-surface border-b border-border-strong shadow-sm z-10 w-full shrink-0 relative">
 
-      {/* 1. Izquierda: Logo + nombre proyecto (Agregué flex-1) */}
+      {/* 1. Izquierda: Logo + nombre proyecto*/}
       <div className="flex items-center gap-4 flex-1">
         <span className="font-bold text-accent text-lg font-outfit tracking-tight select-none">
           XPRIN-Picasso
         </span>
-        {proyectoNombre !== null && (
+        {imagenUrl && (
           <>
             <div className="w-px h-5 bg-border-strong" />
             <div className="relative inline-block w-[210px]">
               <input
                 type="text"
-                value={proyectoNombre}
+                value={proyectoNombre || ''} /* Añadí || '' por si proyectoNombre es null */
                 onChange={(e) => setProyectoNombre(e.target.value)}
                 className="text-sm text-secondary bg-transparent border border-transparent hover:border-border-light focus:border-accent focus:outline-none rounded pl-1.5 pr-8 py-0.5 w-full transition-colors"
                 title="Renombrar archivo PDF"
