@@ -5,6 +5,8 @@ import { useRef, useState } from 'react'
 import { Upload, Sun, Moon, FileDown, ChevronDown, LogOut } from 'lucide-react'
 import { useStore } from '../store'
 import { DetectionSettings } from './DetectionSettings'
+import logoBlanco from '../assets/images/Logo_Blanco.png'
+import logoNegro from '../assets/images/Logo_Negro.png'
 
 export function Header({ theme, toggleTheme }) {
   const fileInputRef  = useRef(null)
@@ -91,15 +93,21 @@ export function Header({ theme, toggleTheme }) {
   }
 
   const spotCount = capas.filter((c) => c.spot !== null).length
+  const logoSrc = theme === 'dark' ? logoBlanco : logoNegro
 
   return (
     <header className="flex items-center justify-between h-[60px] px-6 bg-surface border-b border-border-strong shadow-sm z-10 w-full shrink-0">
 
       {/* Logo + nombre proyecto */}
       <div className="flex items-center gap-4">
-        <span className="font-bold text-accent text-lg font-outfit tracking-tight select-none">
-          XPRIN-Picasso
-        </span>
+        <div className="h-6 w-28 flex items-center">
+          <img
+            src={logoSrc}
+            alt="XPRIN-Picasso"
+            className="h-full w-full object-contain select-none"
+            draggable={false}
+          />
+        </div>
         {proyectoNombre && (
           <>
             <div className="w-px h-5 bg-border-strong" />
