@@ -39,6 +39,7 @@ export const useStore = create((set, get) => ({
     }),
 
   setCapaActiva:    (id)   => set({ capaActivaId: id }),
+  setProyectoNombre: (nombre) => set({ proyectoNombre: nombre }),
   setSetting:       (k, v) => set((s) => ({ settings: { ...s.settings, [k]: v } })),
   resetSettings:    ()     => set({ settings: { ...DEFAULT_SETTINGS } }),
   setCargando:      (v)    => set({ cargando: v }),
