@@ -5,6 +5,8 @@ import { useRef, useState } from 'react'
 import { Upload, Sun, Moon, FileDown, ChevronDown, LogOut } from 'lucide-react'
 import { useStore } from '../store'
 import { DetectionSettings } from './DetectionSettings'
+import lapiz from '../assets/images/lapiz.png'
+import lapizBlanco from '../assets/images/lapizBlanco.png'
 
 export function Header({ theme, toggleTheme }) {
   const fileInputRef = useRef(null)
@@ -93,30 +95,37 @@ export function Header({ theme, toggleTheme }) {
   const spotCount = capas.filter((c) => c.spot !== null).length
 
   return (
-    <header className="flex items-center justify-between h-[60px] px-6 bg-surface border-b border-border-strong shadow-sm z-10 w-full shrink-0">
+    /* Agregué 'relative' al contenedor principal del header */
+    <header className="flex items-center justify-between h-[60px] px-6 bg-surface border-b border-border-strong shadow-sm z-10 w-full shrink-0 relative">
 
-      {/* Logo + nombre proyecto */}
-      <div className="flex items-center gap-4">
+      {/* 1. Izquierda: Logo + nombre proyecto (Agregué flex-1) */}
+      <div className="flex items-center gap-4 flex-1">
         <span className="font-bold text-accent text-lg font-outfit tracking-tight select-none">
           XPRIN-Picasso
         </span>
         {proyectoNombre !== null && (
           <>
             <div className="w-px h-5 bg-border-strong" />
-            <input
-              type="text"
-              value={proyectoNombre}
-              onChange={(e) => setProyectoNombre(e.target.value)}
-              className="text-sm text-secondary bg-transparent border border-transparent hover:border-border-light focus:border-accent focus:outline-none rounded px-1.5 py-0.5 w-[250px] transition-colors"
-              title="Renombrar archivo PDF"
-            />
+            <div className="relative inline-block w-[210px]">
+              <input
+                type="text"
+                value={proyectoNombre}
+                onChange={(e) => setProyectoNombre(e.target.value)}
+                className="text-sm text-secondary bg-transparent border border-transparent hover:border-border-light focus:border-accent focus:outline-none rounded pl-1.5 pr-8 py-0.5 w-full transition-colors"
+                title="Renombrar archivo PDF"
+              />
+              <img
+                src={theme === 'dark' ? lapizBlanco : lapiz}
+                alt="Editar"
+                className="w-5 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-200"
+              />
+            </div>
           </>
         )}
       </div>
 
-      {/* Acciones centrales */}
-      <div className="flex items-center gap-2">
-
+      {/* 2. Centro: Acciones estrictamente centradas (Agregué absolute) */}
+      <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
         {/* Subir imagen */}
         <button
           onClick={() => fileInputRef.current?.click()}
@@ -137,14 +146,22 @@ export function Header({ theme, toggleTheme }) {
         {/* Ajustes detección */}
         <DetectionSettings />
 
-        {/* Exportar PDF — botón principal + dropdown */}
+        {/* Error inline (Mantenido aquí por si ocurre durante la subida/detección) */}
+        {errorMsg && (
+          <span className="text-xs text-accent max-w-xs truncate" title={errorMsg}>{errorMsg}</span>
+        )}
+      </div>
+
+      {/* 3. Derecha: Exportar + contador spots + tema + reset (Agregué flex-1 y justify-end) */}
+      <div className="flex items-center justify-end gap-3 flex-1">
+
+        {/* Exportar PDF (Movido a la zona derecha para que no empuje el centro) */}
         {imagenUrl && (
           <div className="relative">
             <div className={`flex rounded-md overflow-hidden border transition-all duration-200
               ${spotCount === 0 ? 'opacity-40 pointer-events-none' : ''}
               ${exportandoPDF ? 'opacity-70 pointer-events-none' : ''}`}
             >
-              {/* Botón principal — exporta con imagen (estándar) */}
               <button
                 onClick={() => handleExport({ embedImagen: true })}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium
@@ -157,8 +174,6 @@ export function Header({ theme, toggleTheme }) {
                 }
                 {exportandoPDF ? 'Generando...' : 'Exportar PDF'}
               </button>
-
-              {/* Flecha para opciones adicionales */}
               <button
                 onClick={() => setExportMenu((v) => !v)}
                 className="flex items-center justify-center px-2 py-2 bg-accent hover:bg-accent-hover
@@ -169,7 +184,6 @@ export function Header({ theme, toggleTheme }) {
               </button>
             </div>
 
-            {/* Menú desplegable de opciones */}
             {exportMenu && (
               <div className="absolute top-full right-0 mt-1 z-50 w-56 bg-surface rounded-lg shadow-xl
                 border border-border-strong overflow-hidden"
@@ -206,14 +220,6 @@ export function Header({ theme, toggleTheme }) {
           </div>
         )}
 
-        {/* Error inline */}
-        {errorMsg && (
-          <span className="text-xs text-accent max-w-xs truncate" title={errorMsg}>{errorMsg}</span>
-        )}
-      </div>
-
-      {/* Derecha: contador spots + tema + reset */}
-      <div className="flex items-center gap-3">
         {capas.length > 0 && (
           <span className="text-xs text-muted select-none">
             {spotCount}/{capas.length} spots
