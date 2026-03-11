@@ -4,6 +4,39 @@ import { Settings2, RefreshCw } from 'lucide-react'
 import { useStore } from '../store'
 import { useDetectar } from '../useDetectar'
 
+const RANGE_CLASS = `
+  w-full flex-1 h-1.5 rounded-full cursor-pointer appearance-none
+  bg-border-strong
+  [&::-webkit-slider-thumb]:appearance-none
+  [&::-webkit-slider-thumb]:mt-[-4px]
+  [&::-webkit-slider-thumb]:h-3.5
+  [&::-webkit-slider-thumb]:w-3.5
+  [&::-webkit-slider-thumb]:rounded-full
+  [&::-webkit-slider-thumb]:bg-accent
+  [&::-webkit-slider-thumb]:border
+  [&::-webkit-slider-thumb]:border-white/80
+  [&::-moz-range-track]:h-1.5
+  [&::-moz-range-track]:rounded-full
+  [&::-moz-range-track]:bg-transparent
+  [&::-moz-range-thumb]:h-3.5
+  [&::-moz-range-thumb]:w-3.5
+  [&::-moz-range-thumb]:rounded-full
+  [&::-moz-range-thumb]:bg-accent
+  [&::-moz-range-thumb]:border
+  [&::-moz-range-thumb]:border-white/80
+`
+
+function rangeFillStyle(min, max, value) {
+  const nMin = Number(min)
+  const nMax = Number(max)
+  const nVal = Number(value)
+  const pct = ((nVal - nMin) * 100) / (nMax - nMin || 1)
+  const clamped = Math.max(0, Math.min(100, pct))
+  return {
+    background: `linear-gradient(90deg, var(--color-accent) 0%, var(--color-accent) ${clamped}%, var(--color-border-strong) ${clamped}%, var(--color-border-strong) 100%)`,
+  }
+}
+
 function Slider({ label, hint, min, max, step, value, onChange, left, right }) {
   return (
     <div className="flex flex-col gap-1">
@@ -17,7 +50,8 @@ function Slider({ label, hint, min, max, step, value, onChange, left, right }) {
         <input
           type="range" min={min} max={max} step={step} value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="flex-1 h-1.5 accent-red-600 cursor-pointer"
+          className={RANGE_CLASS}
+          style={rangeFillStyle(min, max, value)}
         />
         <span className="text-[11px] text-muted w-5 text-right">{right}</span>
       </div>
@@ -161,7 +195,8 @@ export function DetectionSettings() {
                 <input
                   type="range" min={0} max={14} step={1} value={s.n_colores}
                   onChange={(e) => handleSetting('n_colores', Number(e.target.value))}
-                  className="flex-1 h-1.5 accent-red-600 cursor-pointer"
+                  className={RANGE_CLASS}
+                  style={rangeFillStyle(0, 14, s.n_colores)}
                 />
                 <span className="text-[11px] text-muted w-5 text-right">14</span>
               </div>

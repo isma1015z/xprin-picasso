@@ -271,8 +271,12 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
       </div>
 
       {/* Menú Móvil */}
-      {isMobile && mobileMenuOpen && (
-        <div className="absolute top-full left-0 right-0 z-40 bg-surface border-b border-border-strong shadow-lg px-3 py-2">
+      {isMobile && (
+        <div
+          className={`absolute top-full left-0 right-0 z-40 bg-surface border-b border-border-strong shadow-lg px-3 py-2
+            transition-all duration-300 ease-out origin-top
+            ${mobileMenuOpen ? 'opacity-100 translate-y-0 scale-y-100 pointer-events-auto' : 'opacity-0 -translate-y-2 scale-y-95 pointer-events-none'}`}
+        >
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => fileInputRef.current?.click()}

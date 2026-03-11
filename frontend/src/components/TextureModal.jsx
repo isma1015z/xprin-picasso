@@ -1,29 +1,49 @@
 // TextureModal.jsx — selector de textura en modal
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Search } from 'lucide-react'
 import { TEXTURES } from '../textures'
 
 export function TextureModal({ capaId, capaColor, onSelect, onClose }) {
   const [search, setSearch] = useState('')
+  const [isVisible, setIsVisible] = useState(false)
+  const closeTimerRef = useRef(null)
 
   const filtered = TEXTURES.filter((t) =>
     t.name.toLowerCase().includes(search.toLowerCase())
   )
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setIsVisible(true))
+    return () => {
+      cancelAnimationFrame(raf)
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    }
+  }, [])
+
+  function handleClose() {
+    setIsVisible(false)
+    closeTimerRef.current = setTimeout(() => {
+      onClose()
+    }, 180)
+  }
 
   if (typeof document === 'undefined') return null
 
   return createPortal(
     // Backdrop
     <div
-      className="fixed inset-0 z-[100] grid place-items-center bg-black/60 backdrop-blur-sm p-4 max-md:p-2.5"
-      onClick={onClose}
+      className={`fixed inset-0 z-[100] grid place-items-center backdrop-blur-sm p-4 max-md:p-2.5
+        transition-opacity duration-200 ease-out ${isVisible ? 'bg-black/60 opacity-100' : 'bg-black/0 opacity-0'}`}
+      onClick={handleClose}
     >
       {/* Panel */}
       <div
-        className="relative bg-surface border border-border-strong rounded-xl shadow-2xl
+        className={`relative bg-surface border border-border-strong rounded-xl shadow-2xl
           w-[420px] max-w-[96vw] max-h-[85vh] flex flex-col overflow-hidden
-          max-md:w-[330px] max-md:max-w-[92vw] max-md:max-h-[80vh]"
+          max-md:w-[330px] max-md:max-w-[92vw] max-md:max-h-[80vh]
+          transition-all duration-200 ease-out
+          ${isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-2 scale-[0.98]'}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -39,7 +59,7 @@ export function TextureModal({ capaId, capaColor, onSelect, onClose }) {
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-muted hover:text-primary transition-colors p-1 rounded-md hover:bg-surface-hover"
           >
             <X size={16} />
@@ -73,7 +93,9 @@ export function TextureModal({ capaId, capaColor, onSelect, onClose }) {
                 <button
                   key={tex.id}
                   title={tex.name}
-                  onClick={() => onSelect(capaId, tex.id, tex.disp)}
+                  onClick={() => {
+                    onSelect(capaId, tex.id, tex.disp)
+                  }}
                   className="group flex flex-col rounded-lg border border-border-light overflow-hidden
                     transition-all duration-200 md:hover:border-accent md:hover:shadow-md md:hover:scale-[1.03]
                     bg-surface-elevated cursor-pointer"
@@ -105,7 +127,7 @@ export function TextureModal({ capaId, capaColor, onSelect, onClose }) {
         {/* Footer */}
         <div className="px-5 py-3 border-t border-border-strong shrink-0 max-md:px-4 max-md:py-2.5">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="w-full text-[13px] text-muted hover:text-primary transition-colors py-1"
           >
             Cancelar — mantener sin textura
