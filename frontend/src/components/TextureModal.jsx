@@ -1,5 +1,6 @@
 // TextureModal.jsx — selector de textura en modal
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Search } from 'lucide-react'
 import { TEXTURES } from '../textures'
 
@@ -10,15 +11,17 @@ export function TextureModal({ capaId, capaColor, onSelect, onClose }) {
     t.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     // Backdrop
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] grid place-items-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onClose}
     >
       {/* Panel */}
       <div
-        className="relative bg-surface border border-border-strong rounded-xl shadow-2xl w-[420px] max-h-[85vh] flex flex-col overflow-hidden"
+        className="relative bg-surface border border-border-strong rounded-xl shadow-2xl w-[420px] max-w-[96vw] max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -108,6 +111,7 @@ export function TextureModal({ capaId, capaColor, onSelect, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
