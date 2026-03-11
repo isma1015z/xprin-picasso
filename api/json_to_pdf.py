@@ -1,25 +1,20 @@
 """
-json_to_pdf.py  —  XPRIN-Picasso  (v6.1 — PDF nativo Python puro)
+json_to_pdf.py  —  XPRIN-Picasso  (v6.3 — spots visualmente invisibles)
 ---------------------------------------------------------------
-Genera PDFs de separación UV directamente en Python, sin dependencias externas.
+Cambio clave respecto a v6.2:
 
-Garantías:
-  - /OP true /op true /OPM 1  en cada objeto spot (W1, W2, TEXTURE)
-  - /OP false /op false        en capas CMYK (knockout)
-  - Separation colorspace con tint transform Type 4 { 1 exch sub }
-  - Imagen embebida como JPEG nativo (/Filter /DCTDecode)
+  Tint function: { pop 1 }  (antes: { 1 exch sub })
 
-Estructura de objetos PDF:
-  1 = Catalog
-  2 = Pages
-  3 = Page
-  4 = ExtGState GSOP  (/OP true /op true /OPM 1)
-  5 = ExtGState GSNOP (/OP false /op false)
-  6 = Tint function W1
-  7 = Tint function W2
-  8 = Tint function TEXTURE
-  9 = Content stream
-  10 = Image XObject (si hay imagen)
+  - { pop 1 } mapea cualquier valor de tinta → 1.0 en DeviceGray (blanco)
+  - Los visores PDF renderizan los spots como blanco = invisible sobre imagen
+  - El RIP lee el canal Separation directamente, nunca usa la tint function
+  - El overprint y el orden (imagen primero, spots al final) se mantienen
+
+Orden del content stream:
+  1. Fondo blanco
+  2. Imagen RGB   ← base
+  3. Capas CMYK   (OP=false)
+  4. Spots UV     ← al final con /OP true /op true /OPM 1
 """
 
 import io
@@ -27,7 +22,6 @@ import json
 import os
 import sys
 import argparse
-from datetime import datetime, timezone
 
 try:
     from PIL import Image
@@ -35,10 +29,6 @@ try:
 except ImportError:
     HAS_PILLOW = False
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# CONFIGURACION
-# ═══════════════════════════════════════════════════════════════════════════════
 
 SPOTS_ORDEN = ["w1", "w2", "texture"]
 
@@ -49,17 +39,13 @@ SPOT_NOMBRE_PDF = {
 }
 
 SPOT_CHANNELS = {
-    "w1":      {"nombre": "W1",      "preview_rgb": (0.75, 0.75, 0.80)},
-    "w2":      {"nombre": "W2",      "preview_rgb": (0.60, 0.65, 0.90)},
-    "texture": {"nombre": "TEXTURE", "preview_rgb": (0.95, 0.80, 0.30)},
+    "w1":      {"nombre": "W1",      "preview_rgb": (0.63, 0.63, 0.69)},
+    "w2":      {"nombre": "W2",      "preview_rgb": (0.48, 0.55, 0.87)},
+    "texture": {"nombre": "TEXTURE", "preview_rgb": (0.94, 0.71, 0.16)},
 }
 
 MAX_IMG_PX = 2500
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# COLORES
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def _hex_to_rgb(color):
     if not color:
@@ -100,10 +86,6 @@ def _hex_to_cmyk(color):
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# PATHS
-# ═══════════════════════════════════════════════════════════════════════════════
-
 def _forma_a_pdf_bytes(forma):
     partes = []
     for cmd in forma:
@@ -122,10 +104,6 @@ def _forma_a_pdf_bytes(forma):
             partes.append("h\n")
     return "".join(partes).encode("ascii")
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# IMAGEN
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def _abrir_sobre_blanco(imagen_path):
     img = Image.open(imagen_path)
@@ -152,13 +130,9 @@ def _preparar_jpeg(imagen_path):
         img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
     iw, ih = img.size
     buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=90, optimize=True)
+    img.save(buf, format="JPEG", quality=95, optimize=True)
     return buf.getvalue(), iw, ih
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# GENERADOR PDF NATIVO
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
                        preview=False, embed_imagen=True):
@@ -193,26 +167,40 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
 
     # ── Content stream ─────────────────────────────────────────────────────────
     cs = bytearray()
+
+    # 1. Fondo blanco
     cs += f"q\n1 1 1 rg\n0 0 {ancho} {alto} re\nf\nQ\n\n".encode()
 
+    # 2. Imagen RGB — base
+    jpeg_bytes = None
+    img_w = img_h = 0
+    if embed_imagen and imagen_path and HAS_PILLOW:
+        jpeg_bytes, img_w, img_h = _preparar_jpeg(imagen_path)
+    if jpeg_bytes:
+        cs += f"q\n{ancho} 0 0 {alto} 0 0 cm\n/Im0 Do\nQ\n\n".encode()
+
+    # 3. Capas CMYK (knockout)
     for capa in capas_cmyk:
         cv, mv, yv, kv = _hex_to_cmyk(capa.get("color"))
         for zona in capa.get("zonas", []):
             pb = _forma_a_pdf_bytes(zona.get("forma", []))
             if not pb.strip():
                 continue
-            cs += b"q\n"
-            cs += b"/GSNOP gs\n"
+            cs += b"q\n/GSNOP gs\n"
             cs += f"{cv:.4f} {mv:.4f} {yv:.4f} {kv:.4f} k\n".encode()
             cs += pb
             cs += b"f*\nQ\n\n"
 
+    # 4. Spots UV — al final, overprint ON
+    #    Tint function { pop 1 } → visores renderizan blanco (invisible)
+    #    El RIP lee el canal Separation directamente, ignora la tint function
     for spot in SPOTS_ORDEN:
         lista = por_spot[spot]
         if not lista:
             continue
         ch      = SPOT_CHANNELS[spot]
         cs_name = f"/CS{ch['nombre']}"
+
         for capa in lista:
             opacidad = max(0.0, min(1.0, float(capa.get("opacidad", 1.0))))
             for zona in capa.get("zonas", []):
@@ -224,32 +212,29 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
                     cs += b"/GSOP gs\n"
                 cs += f"{cs_name} cs\n".encode()
                 if preview:
-                    r, g, bv = ch["preview_rgb"]
-                    cs += f"{r:.4f} {g:.4f} {bv:.4f} scn\n".encode()
+                    r, g, b = ch["preview_rgb"]
+                    cs += f"{r:.4f} {g:.4f} {b:.4f} scn\n".encode()
                 else:
                     cs += f"{opacidad:.4f} scn\n".encode()
                 cs += pb
                 cs += b"f*\nQ\n\n"
-
-    jpeg_bytes = None
-    img_w = img_h = 0
-    if embed_imagen and imagen_path and HAS_PILLOW:
-        jpeg_bytes, img_w, img_h = _preparar_jpeg(imagen_path)
-        if jpeg_bytes:
-            cs += f"q\n{ancho} 0 0 {alto} 0 0 cm\n/Im0 Do\nQ\n".encode()
 
     content_bytes = bytes(cs)
 
     # ── Objetos PDF ────────────────────────────────────────────────────────────
     obj_bodies = {}
 
-    tint_stream = b"{ 1 exch sub }"
+    # Tint function: { pop 1 }
+    # pop descarta el valor de tinta, 1 deja blanco en DeviceGray.
+    # Visores normales → blanco = invisible.
+    # RIP UV → lee el canal Separation directamente, no usa esta función.
+    tint_stream = b"{ pop 1 }"
     for key, oid in TINT_IDS.items():
-        header = (
+        hdr = (
             f"<< /FunctionType 4 /Domain [0.0 1.0] /Range [0.0 1.0]"
             f" /Length {len(tint_stream)} >>\nstream\n"
         ).encode()
-        obj_bodies[oid] = header + tint_stream + b"\nendstream"
+        obj_bodies[oid] = hdr + tint_stream + b"\nendstream"
 
     obj_bodies[OBJ_GSOP]  = b"<< /Type /ExtGState /OP true /op true /OPM 1 >>"
     obj_bodies[OBJ_GSNOP] = b"<< /Type /ExtGState /OP false /op false >>"
@@ -259,15 +244,14 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
     ).encode() + content_bytes + b"\nendstream"
 
     if jpeg_bytes:
-        img_header = (
+        img_hdr = (
             f"<< /Type /XObject /Subtype /Image"
             f" /ColorSpace /DeviceRGB"
             f" /Width {img_w} /Height {img_h}"
-            f" /BitsPerComponent 8"
-            f" /Filter /DCTDecode"
+            f" /BitsPerComponent 8 /Filter /DCTDecode"
             f" /Length {len(jpeg_bytes)} >>\nstream\n"
         ).encode()
-        obj_bodies[OBJ_IMAGE] = img_header + jpeg_bytes + b"\nendstream"
+        obj_bodies[OBJ_IMAGE] = img_hdr + jpeg_bytes + b"\nendstream"
 
     cs_entries = []
     for key in SPOTS_ORDEN:
@@ -281,14 +265,13 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
                 f"      /{name} [/Separation /{ch['nombre']} /DeviceGray {tid} 0 R]"
             )
 
-    xobj_block = f"      /XObject << /Im0 {OBJ_IMAGE} 0 R >>" if jpeg_bytes else ""
+    xobj_block = f"\n      /XObject << /Im0 {OBJ_IMAGE} 0 R >>" if jpeg_bytes else ""
 
     resources = (
         f"    /Resources <<\n"
         f"      /ExtGState << /GSOP {OBJ_GSOP} 0 R /GSNOP {OBJ_GSNOP} 0 R >>\n"
-        f"      /ColorSpace <<\n" + "\n".join(cs_entries) + f"\n      >>\n"
-        f"      {xobj_block}\n"
-        f"    >>"
+        f"      /ColorSpace <<\n" + "\n".join(cs_entries) + "\n      >>"
+        + xobj_block + "\n    >>"
     )
 
     obj_bodies[OBJ_PAGE] = (
@@ -300,15 +283,10 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
         f">>"
     ).encode()
 
-    obj_bodies[OBJ_PAGES] = (
-        f"<< /Type /Pages /Kids [{OBJ_PAGE} 0 R] /Count 1 >>"
-    ).encode()
+    obj_bodies[OBJ_PAGES]   = f"<< /Type /Pages /Kids [{OBJ_PAGE} 0 R] /Count 1 >>".encode()
+    obj_bodies[OBJ_CATALOG] = f"<< /Type /Catalog /Pages {OBJ_PAGES} 0 R >>".encode()
 
-    obj_bodies[OBJ_CATALOG] = (
-        f"<< /Type /Catalog /Pages {OBJ_PAGES} 0 R >>"
-    ).encode()
-
-    # ── Serializar PDF ─────────────────────────────────────────────────────────
+    # ── Serializar ─────────────────────────────────────────────────────────────
     buf = bytearray()
     buf += b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"
 
@@ -321,7 +299,6 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
 
     xref_pos = len(buf)
     max_id   = max(obj_bodies.keys())
-
     buf += f"xref\n0 {max_id + 1}\n".encode()
     buf += b"0000000000 65535 f \n"
     for i in range(1, max_id + 1):
@@ -341,7 +318,6 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
     return output_path
 
 
-# ── Alias público usado por main.py ───────────────────────────────────────────
 def generar_pdf(datos, imagen_path, output_path, preview=False,
                 conservar_ps=False, embed_imagen=True, gs_bin=None):
     return generar_pdf_nativo(
@@ -350,30 +326,24 @@ def generar_pdf(datos, imagen_path, output_path, preview=False,
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CLI
-# ═══════════════════════════════════════════════════════════════════════════════
-
 def main():
     parser = argparse.ArgumentParser(
-        description="XPRIN-Picasso v6.1 — JSON → PDF separaciones UV"
+        description="XPRIN-Picasso v6.3 — JSON → PDF separaciones UV"
     )
     parser.add_argument("json")
-    parser.add_argument("--imagen",     "-i", help="Imagen base (.png/.jpg)")
-    parser.add_argument("--output",     "-o", help="Ruta del PDF de salida")
-    parser.add_argument("--preview",          action="store_true")
-    parser.add_argument("--sin-imagen",       action="store_true",
-                        help="Omite la imagen base (solo spots)")
+    parser.add_argument("--imagen",    "-i")
+    parser.add_argument("--output",    "-o")
+    parser.add_argument("--preview",         action="store_true")
+    parser.add_argument("--sin-imagen",      action="store_true")
     args = parser.parse_args()
 
-    print(f"\n{'='*60}\n  XPRIN-Picasso — JSON → PDF  (v6.1)\n{'='*60}")
+    print(f"\n{'='*60}\n  XPRIN-Picasso — JSON → PDF  (v6.3)\n{'='*60}")
 
     with open(args.json, "r", encoding="utf-8") as f:
         datos = json.load(f)
 
     embed_img   = not args.sin_imagen
     imagen_path = args.imagen
-
     if not imagen_path and embed_img:
         json_dir   = os.path.dirname(os.path.abspath(args.json))
         img_ref    = datos.get("imagenBase") or {}
@@ -392,15 +362,15 @@ def main():
         generar_pdf(datos, imagen_path, pdf_path,
                     preview=args.preview, embed_imagen=embed_img)
     except Exception as e:
-        print(f"\n[ERROR] {e}")
+        import traceback; traceback.print_exc()
         sys.exit(1)
 
     size_kb = os.path.getsize(pdf_path) / 1024
     print(f"[OK] PDF: {pdf_path}  ({size_kb:.1f} KB)")
 
     area_total = int(datos["documento"]["ancho"]) * int(datos["documento"]["alto"]) or 1
-    print(f"\n  {'Canal':<10}  {'Capas':>5}  {'Cobertura':>10}")
-    print(f"  {'-'*28}")
+    print(f"\n  Canal       Capas   Cobertura")
+    print(f"  {'-'*30}")
     for spot in SPOTS_ORDEN:
         lista = [c for c in datos.get("capas", []) if c.get("spot") == spot]
         pct   = 100 * sum(c.get("area_px", 0) for c in lista) / area_total
