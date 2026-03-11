@@ -1,8 +1,8 @@
 // Página principal del editor — XPRIN-Picasso
 import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { Canvas }  from '../components/Canvas'
-import { Header }  from '../components/Header'
+import { Canvas } from '../components/Canvas'
+import { Header } from '../components/Header'
 import { Sidebar } from '../components/Sidebar'
 import { useStore } from '../store'
 
@@ -72,9 +72,8 @@ export function Editor() {
               />
             )}
             <div
-              className={`absolute inset-y-0 left-0 z-30 transition-transform duration-300 ease-out ${
-                showSidebar ? 'translate-x-0' : '-translate-x-full'
-              }`}
+              className={`absolute inset-y-0 left-0 z-30 transition-transform duration-300 ease-out ${showSidebar ? 'translate-x-0' : '-translate-x-full'
+                }`}
               style={{ width: sidebarWidth }}
             >
               <Sidebar />
