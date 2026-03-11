@@ -85,6 +85,7 @@ export function Editor() {
           <button
             onClick={() => setShowSidebar((v) => !v)}
             style={{
+              top: isMobile ? 'calc(50% - 30px)' : '50%',
               left: showSidebar ? sidebarWidth + (isMobile ? 8 : 12) : (isMobile ? 10 : 14),
               transform: 'translateY(-50%)',
             }}
