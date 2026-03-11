@@ -58,8 +58,16 @@ export const useStore = create((set, get) => ({
     set((s) => ({
       capas: s.capas.map((c) =>
         c.id === capaId
-          ? { ...c, spot: 'texture', texturaId, texturaDisp }
+          ? { ...c, spot: 'texture', texturaId, texturaDisp, reliefLayers: c.reliefLayers || 10 }
           : c
+      ),
+    })),
+
+  // Modificar capas con un grosor
+  asignarReliefLayer: (capaId, reliefLayers) =>
+    set((s) => ({
+      capas: s.capas.map((c) =>
+        c.id === capaId ? { ...c, reliefLayers } : c
       ),
     })),
 
