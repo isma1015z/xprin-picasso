@@ -14,6 +14,7 @@ export const TEXTURES = [
     style: {},
   },
 
+  // ── Texturas de ejemplo (puedes reemplazarlas con las reales) ──────────────────────────────────────────────
   { id: 'gradient-1', name: 'Cuero', style: { background: 'linear-gradient(to bottom right, #a88d75, #755f4d)' } },
   { id: 'gradient-2', name: 'Amatista', style: { background: 'linear-gradient(to bottom right, #4A00E0, #8E2DE2)' } },
   { id: 'gradient-3', name: 'Oceano', style: { background: 'linear-gradient(135deg, #667db6, #0082c8, #667db6)' } },
