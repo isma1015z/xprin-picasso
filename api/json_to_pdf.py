@@ -1,38 +1,32 @@
 """
-json_to_pdf.py  —  XPRIN-Picasso  (v4.3 — 300 DPI)
+json_to_pdf.py  —  XPRIN-Picasso  (v6.1 — PDF nativo Python puro)
 ---------------------------------------------------------------
-FIX v4.3:
-  Salida siempre a 300 DPI:
-  - Flag -r300 añadida al comando Ghostscript.
-    pdfwrite con -r300 embebe los objetos vectoriales a 300 dpi y
-    rasteriza cualquier contenido que no sea vectorial puro a esa
-    resolución. Es el estándar de preimpresión para UV/serigrafía.
-  - MAX_IMG_PX subido de 1200 a 2500 px.
-    Razón: un documento de 503 pt ≈ 7 pulgadas; a 300 dpi necesita
-    7 × 300 = 2100 px de origen para que la imagen no pierda calidad
-    al rasterizar. Con 2500 px hay margen para documentos más grandes.
+Genera PDFs de separación UV directamente en Python, sin dependencias externas.
 
-FIX v4.2:
-  /typecheck in --concat--
-    CAUSA: "503 0 0 600 0 0 concat" — concat espera array [a b c d e f].
-    FIX:   reemplazado por "503 600 scale".
+Garantías:
+  - /OP true /op true /OPM 1  en cada objeto spot (W1, W2, TEXTURE)
+  - /OP false /op false        en capas CMYK (knockout)
+  - Separation colorspace con tint transform Type 4 { 1 exch sub }
+  - Imagen embebida como JPEG nativo (/Filter /DCTDecode)
 
-MANTENIDOS de v4.1:
-  - DeviceGray como alternate space (compatible GS 10.x Windows)
-  - true setoverprint una vez por canal, fuera de gsave de paths
-  - Colorspaces definidos una vez al inicio (/W1cs /W2cs /TEXTUREcs)
-  - Imagen embebida como JPEG/DCTDecode (no raw hex)
-  - Opción embed_imagen=False para PDF solo spots (carga rápida RIP)
-  - Un gsave por canal, no por zona
+Estructura de objetos PDF:
+  1 = Catalog
+  2 = Pages
+  3 = Page
+  4 = ExtGState GSOP  (/OP true /op true /OPM 1)
+  5 = ExtGState GSNOP (/OP false /op false)
+  6 = Tint function W1
+  7 = Tint function W2
+  8 = Tint function TEXTURE
+  9 = Content stream
+  10 = Image XObject (si hay imagen)
 """
 
 import io
 import json
 import os
 import sys
-import shutil
 import argparse
-import subprocess
 from datetime import datetime, timezone
 
 try:
@@ -60,108 +54,80 @@ SPOT_CHANNELS = {
     "texture": {"nombre": "TEXTURE", "preview_rgb": (0.95, 0.80, 0.30)},
 }
 
-# v4.3: subido de 1200 a 2500 para que la imagen embebida tenga suficiente
-# resolución de origen al rasterizar a 300 dpi.
 MAX_IMG_PX = 2500
-
-# Resolución de salida en DPI (usado en la flag -r de Ghostscript)
-OUTPUT_DPI = 300
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # COLORES
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _hex_to_rgb(color: str | None) -> tuple[float, float, float]:
+def _hex_to_rgb(color):
     if not color:
         return (0.0, 0.0, 0.0)
     c = color.strip().lower().lstrip("#")
     if len(c) == 3:
-        c = "".join(ch*2 for ch in c)
+        c = "".join(ch * 2 for ch in c)
     if len(c) != 6:
         return (0.0, 0.0, 0.0)
     try:
-        return (int(c[0:2],16)/255.0, int(c[2:4],16)/255.0, int(c[4:6],16)/255.0)
+        return (int(c[0:2], 16) / 255.0,
+                int(c[2:4], 16) / 255.0,
+                int(c[4:6], 16) / 255.0)
     except ValueError:
         return (0.0, 0.0, 0.0)
 
 
-def _hex_to_cmyk(color: str | None) -> tuple[float, float, float, float]:
+def _hex_to_cmyk(color):
     if color:
         c = color.strip().lower()
-        if c in ("#fff", "#ffffff"):                return (0.0, 0.0, 0.0, 0.0)
-        if c in ("#000", "#000000"):                return (0.0, 0.0, 0.0, 1.0)
-        if c in ("#00529f", "#003d7c", "#00468b"):  return (1.0, 0.49, 0.0, 0.38)
-        if c in ("#ee324e", "#d00020", "#cc0022"):  return (0.0, 0.79, 0.67, 0.07)
-        if c in ("#febe10", "#ffcc00", "#f5c518"):  return (0.0, 0.25, 0.94, 0.0)
-        if c in ("#6f1f3a", "#7b1f3e", "#8b1f42"):  return (0.0, 0.72, 0.47, 0.57)
-        if c in ("#0d2240", "#0a1f3c", "#0e2244"):  return (0.96, 0.71, 0.0, 0.75)
+        if c in ("#fff", "#ffffff"):               return (0.0, 0.0, 0.0, 0.0)
+        if c in ("#000", "#000000"):               return (0.0, 0.0, 0.0, 1.0)
+        if c in ("#00529f","#003d7c","#00468b"):   return (1.0, 0.49, 0.0, 0.38)
+        if c in ("#ee324e","#d00020","#cc0022"):   return (0.0, 0.79, 0.67, 0.07)
+        if c in ("#febe10","#ffcc00","#f5c518"):   return (0.0, 0.25, 0.94, 0.0)
+        if c in ("#6f1f3a","#7b1f3e","#8b1f42"):   return (0.0, 0.72, 0.47, 0.57)
+        if c in ("#0d2240","#0a1f3c","#0e2244"):   return (0.96, 0.71, 0.0, 0.75)
     r, g, b = _hex_to_rgb(color)
     k = 1.0 - max(r, g, b)
     if k >= 0.999:
         return (0.0, 0.0, 0.0, 1.0)
     d = 1.0 - k
     return (
-        max(0.0, min(1.0, (1.0-r-k)/d)),
-        max(0.0, min(1.0, (1.0-g-k)/d)),
-        max(0.0, min(1.0, (1.0-b-k)/d)),
+        max(0.0, min(1.0, (1.0 - r - k) / d)),
+        max(0.0, min(1.0, (1.0 - g - k) / d)),
+        max(0.0, min(1.0, (1.0 - b - k) / d)),
         max(0.0, min(1.0, k)),
     )
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# RECURSOS SPOT — definidos UNA VEZ al inicio del documento
-# Alternate space: DeviceGray — compatible GS 10.x Windows y todos los RIPs.
-# El RIP usa el NOMBRE del canal (W1/W2/TEXTURE) para las separaciones.
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _definir_recursos_spot(preview: bool = False) -> list[str]:
-    lines = [
-        "% Colorspaces canales spot UV (DeviceGray alternate — GS 10.x Windows)",
-        "",
-    ]
-    for key in SPOTS_ORDEN:
-        ch  = SPOT_CHANNELS[key]
-        var = f"/{ch['nombre']}cs"
-        if preview:
-            r, g, b = ch["preview_rgb"]
-            lines.append(f"{var} [/DeviceRGB] def   % preview {r:.2f} {g:.2f} {b:.2f}")
-        else:
-            lines.append(
-                f"{var} [/Separation ({ch['nombre']}) /DeviceGray {{1 exch sub}}] def"
-            )
-    lines.append("")
-    return lines
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PATHS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _forma_a_ps(forma: list) -> str:
-    lineas = []
+def _forma_a_pdf_bytes(forma):
+    partes = []
     for cmd in forma:
         t = cmd.get("tipo", "")
         if t == "moveto":
-            lineas.append(f"  {cmd['x']:.3f} {cmd['y']:.3f} m")
+            partes.append(f"{cmd['x']:.3f} {cmd['y']:.3f} m\n")
         elif t == "lineto":
-            lineas.append(f"  {cmd['x']:.3f} {cmd['y']:.3f} l")
+            partes.append(f"{cmd['x']:.3f} {cmd['y']:.3f} l\n")
         elif t == "curveto":
-            lineas.append(
-                f"  {cmd['x1']:.3f} {cmd['y1']:.3f}"
-                f"  {cmd['x2']:.3f} {cmd['y2']:.3f}"
-                f"  {cmd['x']:.3f}  {cmd['y']:.3f} c"
+            partes.append(
+                f"{cmd['x1']:.3f} {cmd['y1']:.3f} "
+                f"{cmd['x2']:.3f} {cmd['y2']:.3f} "
+                f"{cmd['x']:.3f} {cmd['y']:.3f} c\n"
             )
         elif t == "closepath":
-            lineas.append("  h")
-    return "\n".join(lineas)
+            partes.append("h\n")
+    return "".join(partes).encode("ascii")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# IMAGEN BASE — embebida como JPEG/DCTDecode
+# IMAGEN
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _abrir_sobre_blanco(imagen_path: str) -> "Image.Image":
+def _abrir_sobre_blanco(imagen_path):
     img = Image.open(imagen_path)
     if img.mode == "P":
         img = img.convert("RGBA")
@@ -176,62 +142,32 @@ def _abrir_sobre_blanco(imagen_path: str) -> "Image.Image":
     return img.convert("RGB")
 
 
-def _imagen_a_ps_bloque(imagen_path: str, ancho_doc: int, alto_doc: int) -> list[str]:
-    if not HAS_PILLOW:
-        return ["% [AVISO] Pillow no instalado — imagen omitida", ""]
-    if not os.path.isfile(imagen_path):
-        return [f"% [AVISO] Imagen no encontrada: {imagen_path}", ""]
-
+def _preparar_jpeg(imagen_path):
+    if not HAS_PILLOW or not os.path.isfile(imagen_path):
+        return None, 0, 0
     img = _abrir_sobre_blanco(imagen_path)
     w, h = img.size
     if w > MAX_IMG_PX or h > MAX_IMG_PX:
         ratio = min(MAX_IMG_PX / w, MAX_IMG_PX / h)
         img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
-
     iw, ih = img.size
-
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=90, optimize=True)
-    jpeg_bytes = buf.getvalue()
-    hex_data   = jpeg_bytes.hex().upper()
-    hex_lines  = [hex_data[i:i+78] for i in range(0, len(hex_data), 78)]
-
-    return [
-        "% Imagen base (JPEG embebido / DCTDecode)",
-        f"% {iw}x{ih}px | {len(jpeg_bytes)//1024}KB",
-        "q",
-        f"  {ancho_doc} {alto_doc} scale",
-        "  /DeviceRGB setcolorspace",
-        "  <<",
-        "    /ImageType 1",
-        f"    /Width {iw}",
-        f"    /Height {ih}",
-        "    /BitsPerComponent 8",
-        "    /Decode [0 1 0 1 0 1]",
-        f"    /ImageMatrix [{iw} 0 0 {-ih} 0 {ih}]",
-        "    /DataSource currentfile /ASCIIHexDecode filter /DCTDecode filter",
-        "  >>",
-        "  image",
-    ] + hex_lines + [">", "Q", ""]
+    return buf.getvalue(), iw, ih
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# GENERADOR PS PRINCIPAL
+# GENERADOR PDF NATIVO
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def generar_postscript(
-    datos: dict,
-    imagen_path: str | None = None,
-    preview: bool = False,
-    embed_imagen: bool = True,
-) -> str:
-    doc    = datos["documento"]
-    ancho  = int(doc["ancho"])
-    alto   = int(doc["alto"])
-    nombre = datos.get("nombre", "proyecto")
-    capas  = datos.get("capas", [])
+def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
+                       preview=False, embed_imagen=True):
+    doc   = datos["documento"]
+    ancho = int(doc["ancho"])
+    alto  = int(doc["alto"])
+    capas = datos.get("capas", [])
 
-    por_spot: dict[str, list] = {s: [] for s in SPOTS_ORDEN}
+    por_spot   = {s: [] for s in SPOTS_ORDEN}
     capas_cmyk = []
     for capa in capas:
         if not capa.get("visible", True):
@@ -242,210 +178,176 @@ def generar_postscript(
         else:
             capas_cmyk.append(capa)
 
-    area_total = ancho * alto or 1
-    cobertura = {
-        s: round(100 * sum(c.get("area_px", 0) for c in lst) / area_total, 2)
-        for s, lst in por_spot.items()
-    }
+    OBJ_CATALOG  = 1
+    OBJ_PAGES    = 2
+    OBJ_PAGE     = 3
+    OBJ_GSOP     = 4
+    OBJ_GSNOP    = 5
+    OBJ_TINT_W1  = 6
+    OBJ_TINT_W2  = 7
+    OBJ_TINT_TEX = 8
+    OBJ_CONTENT  = 9
+    OBJ_IMAGE    = 10
 
-    ts   = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    modo = "PREVIEW" if preview else "PREIMPRESION"
+    TINT_IDS = {"w1": OBJ_TINT_W1, "w2": OBJ_TINT_W2, "texture": OBJ_TINT_TEX}
 
-    lines = [
-        "%!PS-Adobe-3.0",
-        f"%%Title: XPRIN-Picasso -- {nombre}",
-        f"%%Creator: json_to_pdf.py v4.3 ({modo}) {OUTPUT_DPI}dpi",
-        f"%%CreationDate: {ts}",
-        f"%%BoundingBox: 0 0 {ancho} {alto}",
-        "%%DocumentColorSpaces: (W1) (W2) (TEXTURE)",
-        "%%EndComments",
-        "",
-        "/m { moveto }    bind def",
-        "/l { lineto }    bind def",
-        "/c { curveto }   bind def",
-        "/h { closepath } bind def",
-        "/f { eofill }    bind def",
-        "/q { gsave }     bind def",
-        "/Q { grestore }  bind def",
-        "",
-        f"<< /PageSize [{ancho} {alto}] >> setpagedevice",
-        "",
-        "% Cobertura spots:",
-    ]
+    # ── Content stream ─────────────────────────────────────────────────────────
+    cs = bytearray()
+    cs += f"q\n1 1 1 rg\n0 0 {ancho} {alto} re\nf\nQ\n\n".encode()
+
+    for capa in capas_cmyk:
+        cv, mv, yv, kv = _hex_to_cmyk(capa.get("color"))
+        for zona in capa.get("zonas", []):
+            pb = _forma_a_pdf_bytes(zona.get("forma", []))
+            if not pb.strip():
+                continue
+            cs += b"q\n"
+            cs += b"/GSNOP gs\n"
+            cs += f"{cv:.4f} {mv:.4f} {yv:.4f} {kv:.4f} k\n".encode()
+            cs += pb
+            cs += b"f*\nQ\n\n"
+
     for spot in SPOTS_ORDEN:
-        lines.append(
-            f"%   {SPOT_NOMBRE_PDF[spot]}: {cobertura[spot]}%"
-            f"  ({len(por_spot[spot])} capas)"
-        )
-    lines.append("")
-
-    lines += _definir_recursos_spot(preview=preview)
-
-    # ── Fondo blanco ──────────────────────────────────────────────────────────
-    lines += [
-        "% Fondo blanco",
-        "q",
-        "  /DeviceRGB setcolorspace",
-        "  1 1 1 setcolor",
-        f"  0 0 {ancho} {alto} rectfill",
-        "Q",
-        "",
-    ]
-
-    # ── Capas CMYK ────────────────────────────────────────────────────────────
-    if capas_cmyk:
-        lines += [
-            f"% Capas CMYK ({len(capas_cmyk)})",
-            "q",
-            "  /DeviceCMYK setcolorspace",
-            "",
-        ]
-        for capa in capas_cmyk:
-            nombre_c = capa.get("nombre", "Capa").encode("ascii", "replace").decode()
-            cv, mv, yv, kv = _hex_to_cmyk(capa.get("color"))
-            lines.append(f"  % {nombre_c}  C{cv:.2f} M{mv:.2f} Y{yv:.2f} K{kv:.2f}")
-            for zona in capa.get("zonas", []):
-                forma_ps = _forma_a_ps(zona.get("forma", []))
-                if not forma_ps.strip():
-                    continue
-                lines += [
-                    f"  {cv:.4f} {mv:.4f} {yv:.4f} {kv:.4f} setcolor",
-                    "  newpath",
-                    forma_ps,
-                    "  f",
-                    "",
-                ]
-        lines += ["Q", ""]
-
-    # ── Canales spot ──────────────────────────────────────────────────────────
-    for spot in SPOTS_ORDEN:
-        lista      = por_spot[spot]
-        nombre_pdf = SPOT_NOMBRE_PDF[spot]
-        ch         = SPOT_CHANNELS[spot]
-        cs_var     = f"{ch['nombre']}cs"
-
-        lines.append(
-            f"% Canal spot: {nombre_pdf}"
-            f"  ({len(lista)} capa(s), {cobertura[spot]}%)"
-        )
-
+        lista = por_spot[spot]
         if not lista:
-            lines += [f"% (sin capas para {nombre_pdf})", ""]
             continue
-
-        lines += ["q", f"  {cs_var} setcolorspace"]
-
-        if not preview:
-            lines += ["  true setoverprint", ""]
-
+        ch      = SPOT_CHANNELS[spot]
+        cs_name = f"/CS{ch['nombre']}"
         for capa in lista:
-            nombre_c = capa.get("nombre", "Capa").encode("ascii", "replace").decode()
             opacidad = max(0.0, min(1.0, float(capa.get("opacidad", 1.0))))
-            lines.append(f"  % {nombre_c}")
-
             for zona in capa.get("zonas", []):
-                forma_ps = _forma_a_ps(zona.get("forma", []))
-                if not forma_ps.strip():
+                pb = _forma_a_pdf_bytes(zona.get("forma", []))
+                if not pb.strip():
                     continue
+                cs += b"q\n"
+                if not preview:
+                    cs += b"/GSOP gs\n"
+                cs += f"{cs_name} cs\n".encode()
                 if preview:
-                    r, g, b = ch["preview_rgb"]
-                    lines += [
-                        f"  {r:.4f} {g:.4f} {b:.4f} setcolor",
-                        "  newpath", forma_ps, "  f", "",
-                    ]
+                    r, g, bv = ch["preview_rgb"]
+                    cs += f"{r:.4f} {g:.4f} {bv:.4f} scn\n".encode()
                 else:
-                    lines += [
-                        f"  {opacidad:.4f} setcolor",
-                        "  newpath", forma_ps, "  f", "",
-                    ]
+                    cs += f"{opacidad:.4f} scn\n".encode()
+                cs += pb
+                cs += b"f*\nQ\n\n"
 
-        lines += ["Q", ""]
+    jpeg_bytes = None
+    img_w = img_h = 0
+    if embed_imagen and imagen_path and HAS_PILLOW:
+        jpeg_bytes, img_w, img_h = _preparar_jpeg(imagen_path)
+        if jpeg_bytes:
+            cs += f"q\n{ancho} 0 0 {alto} 0 0 cm\n/Im0 Do\nQ\n".encode()
 
-    # ── Imagen base ───────────────────────────────────────────────────────────
-    if embed_imagen and imagen_path:
-        lines += _imagen_a_ps_bloque(imagen_path, ancho, alto)
-    elif not embed_imagen:
-        lines += ["% Imagen omitida (modo solo-spots para RIP)", ""]
-    else:
-        lines += ["% Sin imagen base", ""]
+    content_bytes = bytes(cs)
 
-    lines += ["showpage", "%%EOF", ""]
-    return "\n".join(lines)
+    # ── Objetos PDF ────────────────────────────────────────────────────────────
+    obj_bodies = {}
 
+    tint_stream = b"{ 1 exch sub }"
+    for key, oid in TINT_IDS.items():
+        header = (
+            f"<< /FunctionType 4 /Domain [0.0 1.0] /Range [0.0 1.0]"
+            f" /Length {len(tint_stream)} >>\nstream\n"
+        ).encode()
+        obj_bodies[oid] = header + tint_stream + b"\nendstream"
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# GHOSTSCRIPT
-# ═══════════════════════════════════════════════════════════════════════════════
+    obj_bodies[OBJ_GSOP]  = b"<< /Type /ExtGState /OP true /op true /OPM 1 >>"
+    obj_bodies[OBJ_GSNOP] = b"<< /Type /ExtGState /OP false /op false >>"
 
-def buscar_ghostscript() -> str | None:
-    for nombre in ("gswin64c", "gswin32c", "gs"):
-        ruta = shutil.which(nombre)
-        if ruta:
-            return ruta
-    gs_dir = r"C:\Program Files\gs"
-    if os.path.isdir(gs_dir):
-        for version in sorted(os.listdir(gs_dir), reverse=True):
-            candidato = os.path.join(gs_dir, version, "bin", "gswin64c.exe")
-            if os.path.isfile(candidato):
-                return candidato
-    return None
+    obj_bodies[OBJ_CONTENT] = (
+        f"<< /Length {len(content_bytes)} >>\nstream\n"
+    ).encode() + content_bytes + b"\nendstream"
 
+    if jpeg_bytes:
+        img_header = (
+            f"<< /Type /XObject /Subtype /Image"
+            f" /ColorSpace /DeviceRGB"
+            f" /Width {img_w} /Height {img_h}"
+            f" /BitsPerComponent 8"
+            f" /Filter /DCTDecode"
+            f" /Length {len(jpeg_bytes)} >>\nstream\n"
+        ).encode()
+        obj_bodies[OBJ_IMAGE] = img_header + jpeg_bytes + b"\nendstream"
 
-def ps_a_pdf(ps_path: str, pdf_path: str, gs_bin: str) -> None:
-    cmd = [
-        gs_bin, "-dBATCH", "-dNOPAUSE",
-        "-sDEVICE=pdfwrite",
-        f"-r{OUTPUT_DPI}",           # v4.3: resolución 300 DPI
-        "-dPDFSETTINGS=/prepress",
-        "-dPreserveSpotColors=true",
-        "-dOverprintPreview=true",
-        f"-sOutputFile={pdf_path}",
-        ps_path,
-    ]
-    r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                       text=True, encoding="utf-8", errors="replace")
-    if r.returncode != 0:
-        detalle = (r.stdout or "").strip()
-        if not detalle:
-            detalle = "sin detalle — activa --debug para conservar el .ps"
-        raise RuntimeError(
-            f"Ghostscript error (codigo {r.returncode}):\n{detalle[:3000]}"
-        )
+    cs_entries = []
+    for key in SPOTS_ORDEN:
+        ch   = SPOT_CHANNELS[key]
+        name = f"CS{ch['nombre']}"
+        if preview:
+            cs_entries.append(f"      /{name} [/DeviceRGB]")
+        else:
+            tid = TINT_IDS[key]
+            cs_entries.append(
+                f"      /{name} [/Separation /{ch['nombre']} /DeviceGray {tid} 0 R]"
+            )
 
+    xobj_block = f"      /XObject << /Im0 {OBJ_IMAGE} 0 R >>" if jpeg_bytes else ""
 
-def generar_pdf(
-    datos: dict,
-    imagen_path: str | None,
-    output_path: str,
-    gs_bin: str | None = None,
-    preview: bool = False,
-    conservar_ps: bool = False,
-    embed_imagen: bool = True,
-) -> str:
-    ps_path    = output_path.replace(".pdf", "_tmp.ps")
-    ps_content = generar_postscript(datos, imagen_path, preview=preview,
-                                    embed_imagen=embed_imagen)
+    resources = (
+        f"    /Resources <<\n"
+        f"      /ExtGState << /GSOP {OBJ_GSOP} 0 R /GSNOP {OBJ_GSNOP} 0 R >>\n"
+        f"      /ColorSpace <<\n" + "\n".join(cs_entries) + f"\n      >>\n"
+        f"      {xobj_block}\n"
+        f"    >>"
+    )
 
-    with open(ps_path, "w", encoding="ascii", errors="replace") as f:
-        f.write(ps_content)
+    obj_bodies[OBJ_PAGE] = (
+        f"<< /Type /Page\n"
+        f"   /Parent {OBJ_PAGES} 0 R\n"
+        f"   /MediaBox [0 0 {ancho} {alto}]\n"
+        f"{resources}\n"
+        f"   /Contents {OBJ_CONTENT} 0 R\n"
+        f">>"
+    ).encode()
 
-    gs = gs_bin or buscar_ghostscript()
-    if not gs:
-        raise RuntimeError(
-            "Ghostscript no encontrado. "
-            "Descargalo en: https://www.ghostscript.com/releases/gsdnld.html"
-        )
+    obj_bodies[OBJ_PAGES] = (
+        f"<< /Type /Pages /Kids [{OBJ_PAGE} 0 R] /Count 1 >>"
+    ).encode()
 
-    try:
-        ps_a_pdf(ps_path, output_path, gs)
-    except Exception:
-        print(f"  [DEBUG] PS conservado: {ps_path}")
-        raise
-    finally:
-        if not conservar_ps and os.path.isfile(ps_path) and os.path.isfile(output_path):
-            os.remove(ps_path)
+    obj_bodies[OBJ_CATALOG] = (
+        f"<< /Type /Catalog /Pages {OBJ_PAGES} 0 R >>"
+    ).encode()
+
+    # ── Serializar PDF ─────────────────────────────────────────────────────────
+    buf = bytearray()
+    buf += b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"
+
+    offsets = {}
+    for oid in sorted(obj_bodies.keys()):
+        offsets[oid] = len(buf)
+        buf += f"{oid} 0 obj\n".encode()
+        buf += obj_bodies[oid]
+        buf += b"\nendobj\n\n"
+
+    xref_pos = len(buf)
+    max_id   = max(obj_bodies.keys())
+
+    buf += f"xref\n0 {max_id + 1}\n".encode()
+    buf += b"0000000000 65535 f \n"
+    for i in range(1, max_id + 1):
+        if i in offsets:
+            buf += f"{offsets[i]:010d} 00000 n \n".encode()
+        else:
+            buf += b"0000000000 65535 f \n"
+
+    buf += (
+        f"trailer\n<< /Size {max_id + 1} /Root {OBJ_CATALOG} 0 R >>\n"
+        f"startxref\n{xref_pos}\n%%EOF\n"
+    ).encode()
+
+    with open(output_path, "wb") as f:
+        f.write(buf)
 
     return output_path
+
+
+# ── Alias público usado por main.py ───────────────────────────────────────────
+def generar_pdf(datos, imagen_path, output_path, preview=False,
+                conservar_ps=False, embed_imagen=True, gs_bin=None):
+    return generar_pdf_nativo(
+        datos, imagen_path, output_path,
+        preview=preview, embed_imagen=embed_imagen,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -454,63 +356,44 @@ def generar_pdf(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="XPRIN-Picasso v4.3 — JSON capas → PDF separaciones UV (300 DPI)"
+        description="XPRIN-Picasso v6.1 — JSON → PDF separaciones UV"
     )
     parser.add_argument("json")
-    parser.add_argument("--imagen",    "-i", help="Ruta a la imagen base")
-    parser.add_argument("--output",    "-o", help="Ruta del PDF de salida")
-    parser.add_argument("--gs",              help="Ruta al ejecutable Ghostscript")
-    parser.add_argument("--preview",         action="store_true")
-    parser.add_argument("--sin-imagen",      action="store_true",
-                        help="Solo paths spot (sin imagen, para RIP)")
-    parser.add_argument("--debug",           action="store_true",
-                        help="Conserva el .ps tras convertir")
-    parser.add_argument("--solo-ps",         action="store_true")
+    parser.add_argument("--imagen",     "-i", help="Imagen base (.png/.jpg)")
+    parser.add_argument("--output",     "-o", help="Ruta del PDF de salida")
+    parser.add_argument("--preview",          action="store_true")
+    parser.add_argument("--sin-imagen",       action="store_true",
+                        help="Omite la imagen base (solo spots)")
     args = parser.parse_args()
 
-    print(f"\n{'='*60}\n  XPRIN-Picasso — JSON → PDF  (v4.3 — {OUTPUT_DPI} DPI)\n{'='*60}")
+    print(f"\n{'='*60}\n  XPRIN-Picasso — JSON → PDF  (v6.1)\n{'='*60}")
 
     with open(args.json, "r", encoding="utf-8") as f:
         datos = json.load(f)
 
-    embed_img = not args.sin_imagen
+    embed_img   = not args.sin_imagen
     imagen_path = args.imagen
+
     if not imagen_path and embed_img:
         json_dir   = os.path.dirname(os.path.abspath(args.json))
         img_ref    = datos.get("imagenBase") or {}
         img_nombre = img_ref.get("ruta", "") if isinstance(img_ref, dict) else str(img_ref)
-        for cand in [img_nombre, os.path.join(json_dir, img_nombre),
+        for cand in [img_nombre,
+                     os.path.join(json_dir, img_nombre),
                      os.path.join(json_dir, os.path.basename(img_nombre))]:
             if cand and os.path.isfile(cand):
-                imagen_path = cand; break
+                imagen_path = cand
+                break
 
     base     = os.path.splitext(args.json)[0]
-    ps_path  = base + "_tmp.ps"
     pdf_path = args.output or base + "_spots.pdf"
 
-    ps_content = generar_postscript(datos, imagen_path, preview=args.preview,
-                                    embed_imagen=embed_img)
-    with open(ps_path, "w", encoding="ascii", errors="replace") as f:
-        f.write(ps_content)
-    print(f"  PS: {ps_path}  ({len(ps_content)//1024} KB)")
-
-    if args.solo_ps:
-        print("[OK] --solo-ps listo.")
-        return
-
-    gs_bin = args.gs or buscar_ghostscript()
-    if not gs_bin:
-        print("[AVISO] Ghostscript no encontrado.")
-        sys.exit(1)
-
     try:
-        ps_a_pdf(ps_path, pdf_path, gs_bin)
-    except RuntimeError as e:
+        generar_pdf(datos, imagen_path, pdf_path,
+                    preview=args.preview, embed_imagen=embed_img)
+    except Exception as e:
         print(f"\n[ERROR] {e}")
         sys.exit(1)
-
-    if not args.debug and os.path.isfile(ps_path):
-        os.remove(ps_path)
 
     size_kb = os.path.getsize(pdf_path) / 1024
     print(f"[OK] PDF: {pdf_path}  ({size_kb:.1f} KB)")
