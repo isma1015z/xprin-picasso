@@ -5,6 +5,7 @@
 
 # Especificos por carpeta
 api/.env
+api/uploads/
 frontend/.env
 
 # Dependencias
@@ -28,3 +29,5 @@ venv/
 .DS_Store
 *.suo
 *.sw?
+*.pdf
+*.ps
