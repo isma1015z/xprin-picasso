@@ -127,7 +127,8 @@ export function Canvas() {
           disabled={cargando}
           className="flex flex-col items-center justify-center w-[400px] h-[300px] border-2 border-dashed
             border-border-strong rounded-xl bg-surface-elevated/50 hover:bg-surface
-            transition-colors duration-200 select-none cursor-pointer disabled:opacity-50"
+            transition-colors duration-200 select-none cursor-pointer disabled:opacity-50
+            max-md:w-[92vw] max-md:h-[240px]"
         >
           {cargando ? (
             <svg className="w-12 h-12 text-muted mb-4 animate-spin" viewBox="0 0 24 24" fill="none">
