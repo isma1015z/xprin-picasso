@@ -10,7 +10,6 @@ Editor web de impresi√≥n UV especial. Permite cargar una imagen, detectar autom√
 
 - Python 3.12
 - Node.js 18+
-- Ghostscript instalado en `C:\Program Files\gs\gs10.x.x\bin\gswin64c.exe`
 
 ### Backend
 
