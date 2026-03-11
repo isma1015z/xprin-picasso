@@ -189,7 +189,7 @@ export function Sidebar() {
                           type="number"
                           min={1}
                           max={999}
-                          value={capa.reliefLayers || 10}
+                          value={capa.reliefLayers || 1}
                           onChange={(e) => {
                             e.stopPropagation()
                             const v = parseInt(e.target.value, 10)
