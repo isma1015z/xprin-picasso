@@ -126,7 +126,7 @@ export function DetectionSettings() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[12px] font-medium text-primary">Eliminar fondo</p>
-                <p className="text-[11px] text-muted">rembg AI background removal</p>
+                <p className="text-[11px] text-muted">IMPORTANTE: si estás usando una imagen sin fondo desactiva esta opción</p>
               </div>
               <button
                 onClick={() => handleSetting('remove_bg', !s.remove_bg)}
