@@ -1,13 +1,13 @@
 // Header — diseño de Prueba_EditorPicasso + funcionalidad XPRIN-Picasso
 import { useRef, useState } from 'react'
-import { Upload, Sun, Moon, FileDown, ChevronDown, LogOut } from 'lucide-react'
+import { Upload, Sun, Moon, FileDown, ChevronDown, LogOut, Menu, X } from 'lucide-react'
 import { useStore } from '../store'
 import { useDetectar } from '../useDetectar'
 import { DetectionSettings } from './DetectionSettings'
 import logoBlanco from '../assets/images/Logo_Blanco.png'
 import logoNegro from '../assets/images/Logo_Negro.png'
 
-export function Header({ theme, toggleTheme }) {
+export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = false, toggleMobileMenu = () => {} }) {
   const fileInputRef  = useRef(null)
   const [exportMenu, setExportMenu] = useState(false)
   const {
@@ -70,10 +70,10 @@ export function Header({ theme, toggleTheme }) {
   const logoSrc   = theme === 'dark' ? logoBlanco : logoNegro
 
   return (
-    <header className="flex items-center justify-between h-[60px] px-6 bg-surface border-b border-border-strong shadow-sm z-10 w-full shrink-0">
+    <header className="relative flex items-center justify-between h-[60px] px-6 bg-surface border-b border-border-strong shadow-sm z-10 w-full shrink-0 max-md:px-3">
 
       {/* Logo + nombre proyecto */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 min-w-0">
         <div className="h-6 w-28 flex items-center">
           <img
             src={logoSrc}
@@ -84,14 +84,14 @@ export function Header({ theme, toggleTheme }) {
         </div>
         {proyectoNombre && (
           <>
-            <div className="w-px h-5 bg-border-strong" />
-            <span className="text-sm text-secondary truncate max-w-48">{proyectoNombre}</span>
+            <div className="w-px h-5 bg-border-strong max-md:hidden" />
+            <span className="text-sm text-secondary truncate max-w-48 max-md:hidden">{proyectoNombre}</span>
           </>
         )}
       </div>
 
       {/* Acciones centrales */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 max-md:hidden">
 
         {/* Subir imagen */}
         <button
@@ -99,7 +99,7 @@ export function Header({ theme, toggleTheme }) {
           disabled={cargando}
           className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium border border-border-light
             bg-surface-elevated text-secondary hover:bg-surface-hover hover:text-primary hover:border-border-strong
-            transition-all duration-200 disabled:opacity-50 cursor-pointer"
+            transition-all duration-200 disabled:opacity-50 cursor-pointer max-md:px-3 max-md:text-xs whitespace-nowrap"
         >
           {cargando
             ? <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
@@ -169,14 +169,14 @@ export function Header({ theme, toggleTheme }) {
 
         {/* Error inline */}
         {errorMsg && (
-          <span className="text-xs text-accent max-w-xs truncate" title={errorMsg}>{errorMsg}</span>
+          <span className="text-xs text-accent max-w-xs truncate max-md:hidden" title={errorMsg}>{errorMsg}</span>
         )}
       </div>
 
       {/* Derecha */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 max-md:ml-auto max-md:gap-2">
         {capas.length > 0 && (
-          <span className="text-xs text-muted select-none">
+          <span className="text-xs text-muted select-none max-md:hidden">
             {spotCount}/{capas.length} spots
           </span>
         )}
@@ -187,18 +187,121 @@ export function Header({ theme, toggleTheme }) {
         >
           {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
         </button>
+        {isMobile && (
+          <button
+            onClick={toggleMobileMenu}
+            className="flex items-center justify-center w-9 h-9 rounded-md text-secondary border border-border-light
+              bg-surface-elevated hover:bg-surface-hover hover:text-primary transition-all duration-200 cursor-pointer"
+            aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+          >
+            {mobileMenuOpen ? <X size={17} /> : <Menu size={17} />}
+          </button>
+        )}
         {imagenUrl && (
           <button
             onClick={resetEditor}
             className="flex items-center gap-2 px-4 py-2 bg-surface-elevated text-secondary border border-border-light
               rounded-md text-sm font-medium transition-all duration-200 hover:bg-surface-hover hover:text-primary
-              hover:border-border-strong cursor-pointer"
+              hover:border-border-strong cursor-pointer max-md:hidden"
           >
             <LogOut size={15} />
-            Reiniciar
+            <span>Reiniciar</span>
           </button>
         )}
       </div>
+
+      {isMobile && mobileMenuOpen && (
+        <div className="absolute top-full left-0 right-0 z-40 bg-surface border-b border-border-strong shadow-lg px-3 py-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={cargando}
+              className="h-10 w-full flex items-center justify-center gap-1.5 px-3 rounded-md text-xs font-medium border border-border-light
+                bg-surface-elevated text-secondary hover:bg-surface-hover hover:text-primary hover:border-border-strong
+                transition-all duration-200 disabled:opacity-50 cursor-pointer"
+            >
+              {cargando ? (
+                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+              ) : (
+                <Upload size={14} />
+              )}
+              {imagenUrl ? 'Cambiar imagen' : 'Subir imagen'}
+            </button>
+
+            <div className="[&>div]:w-full [&>div>button]:h-10 [&>div>button]:w-full [&>div>button]:justify-center [&>div>button]:px-3 [&>div>button]:text-xs">
+              <DetectionSettings />
+            </div>
+
+            {imagenUrl && (
+              <button
+                onClick={() => handleExport({ embedImagen: true })}
+                className={`h-10 w-full flex items-center justify-center gap-1.5 px-3 rounded-md text-xs font-medium
+                  transition-colors cursor-pointer bg-accent text-white hover:bg-accent-hover
+                  ${spotCount === 0 ? 'opacity-40 pointer-events-none' : ''}
+                  ${exportandoPDF ? 'opacity-70 pointer-events-none' : ''}`}
+              >
+                {exportandoPDF ? <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg> : <FileDown size={14} />}
+                Exportar PDF
+              </button>
+            )}
+
+            {imagenUrl && (
+              <button
+                onClick={resetEditor}
+                className="h-10 w-full flex items-center justify-center gap-1.5 px-3 rounded-md text-xs font-medium
+                  border border-border-light bg-surface-elevated text-secondary hover:bg-surface-hover hover:text-primary
+                  hover:border-border-strong transition-all duration-200 cursor-pointer"
+              >
+                <LogOut size={14} />
+                Reiniciar
+              </button>
+            )}
+          </div>
+
+          {imagenUrl && (
+            <div className="mt-2 relative">
+              <button
+                onClick={() => setExportMenu((v) => !v)}
+                className="h-9 w-full flex items-center justify-center gap-1.5 rounded-md text-[11px] font-medium
+                  border border-border-light bg-surface-elevated text-secondary hover:bg-surface-hover hover:text-primary
+                  transition-colors cursor-pointer"
+              >
+                Opciones de exportación
+                <ChevronDown size={12} className={`transition-transform ${exportMenu ? 'rotate-180' : ''}`} />
+              </button>
+
+              {exportMenu && (
+                <div className="absolute top-full left-0 mt-1 z-50 w-full bg-surface rounded-lg shadow-xl
+                    border border-border-strong overflow-hidden"
+                    onMouseLeave={() => setExportMenu(false)}
+                >
+                  <button onClick={() => handleExport({ embedImagen: true })}
+                    className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover transition-colors cursor-pointer">
+                    <div className="font-medium">Con imagen</div>
+                    <div className="text-xs text-muted">PDF completo para revisión</div>
+                  </button>
+                  <div className="border-t border-border-light" />
+                  <button onClick={() => handleExport({ embedImagen: false })}
+                    className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover transition-colors cursor-pointer">
+                    <div className="font-medium">Solo spots (RIP)</div>
+                    <div className="text-xs text-muted">Sin imagen — más ligero para el RIP</div>
+                  </button>
+                  <div className="border-t border-border-light" />
+                  <button onClick={() => handleExport({ embedImagen: true, preview: true })}
+                    className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover transition-colors cursor-pointer">
+                    <div className="font-medium">Preview (RGB)</div>
+                    <div className="text-xs text-muted">Spots en color para verificar</div>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {errorMsg && (
+            <div className="text-[11px] text-accent truncate mt-1" title={errorMsg}>{errorMsg}</div>
+          )}
+        </div>
+      )}
     </header>
   )
 }

@@ -1,7 +1,7 @@
 // Sidebar — Capas por color · Spots UV
 
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useStore } from '../store'
 import { TEXTURES } from '../textures'
 import { TextureModal } from './TextureModal'
@@ -61,7 +61,7 @@ function SpotBadge({ spot }) {
 export function Sidebar() {
   const {
     capas, capaActivaId,
-    setCapaActiva, asignarSpot, asignarTextura, asignarReliefLayer, toggleVisible,
+    setCapaActiva, asignarSpot, asignarTextura, asignarReliefLayer,
   } = useStore()
 
   const [modalTextura, setModalTextura] = useState(null)
@@ -86,7 +86,7 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="w-[280px] bg-surface border-r border-border-strong flex flex-col overflow-y-auto shadow-[2px_0_8px_rgba(0,0,0,0.08)] shrink-0">
+      <aside className="w-[240px] h-full bg-surface border-r border-border-strong flex flex-col overflow-y-auto shadow-[2px_0_8px_rgba(0,0,0,0.08)] shrink-0 max-md:w-full">
 
         {/* ── CAPAS ───────────────────────────────────────────────────────── */}
         <AccordionItem
@@ -121,17 +121,10 @@ export function Sidebar() {
                     <span className="text-[13px] text-primary font-medium flex-1 truncate">
                       {capa.nombre}
                     </span>
-                    <span className="text-[11px] text-muted shrink-0">
-                      {(capa.area_px / 1000).toFixed(1)}k
-                    </span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); toggleVisible(capa.id) }}
-                      className="text-muted hover:text-primary transition-colors shrink-0"
-                      title={capa.visible ? 'Ocultar' : 'Mostrar'}
-                    >
-                      {capa.visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                    </button>
-                  </div>
+                  <span className="text-[11px] text-muted shrink-0">
+                    {(capa.area_px / 1000).toFixed(1)}k
+                  </span>
+                </div>
 
                   {/* Selector spot */}
                   <div className="mt-2 flex items-center gap-1.5">
