@@ -25,7 +25,14 @@ function formaToSVGPath(forma, alto) {
 
 // Controles de zoom — dentro del contexto TransformWrapper
 function ZoomControls() {
-  const { zoomIn, zoomOut, resetTransform } = useControls()
+  const { zoomIn, zoomOut, resetTransform, centerView } = useControls()
+
+  function handleResetView() {
+    resetTransform()
+    // Asegura recentrado después de soltar cualquier desplazamiento acumulado
+    requestAnimationFrame(() => centerView(1, 250))
+  }
+
   return (
     <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-surface rounded-full px-2 py-1.5 shadow-md border border-border-light z-20">
       <button
@@ -36,7 +43,7 @@ function ZoomControls() {
         <ZoomOut size={14} />
       </button>
       <button
-        onClick={() => resetTransform()}
+        onClick={handleResetView}
         className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors"
         title="Restablecer vista"
       >
