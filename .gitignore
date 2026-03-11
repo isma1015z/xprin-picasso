@@ -5,7 +5,8 @@
 
 # Especificos por carpeta
 api/.env
-api/uploads/
+api/img/exports/*
+api/img/uploads/*
 frontend/.env
 
 # Dependencias

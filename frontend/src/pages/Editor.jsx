@@ -6,7 +6,9 @@ import { Sidebar } from '../components/Sidebar'
 import { useStore } from '../store'
 
 export function Editor() {
-  const [theme, setTheme] = useState('light')
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem('xprin-theme') || 'light'
+  )
   const { imagenUrl } = useStore()
 
   useEffect(() => {
@@ -15,6 +17,7 @@ export function Editor() {
     } else {
       document.documentElement.classList.remove('dark')
     }
+    localStorage.setItem('xprin-theme', theme)
   }, [theme])
 
   return (
