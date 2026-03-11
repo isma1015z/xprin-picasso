@@ -182,10 +182,10 @@ export function Login() {
               <span className="text-2xl font-black text-brand-dark tracking-tight">XPRIN</span>
             </div>
 
-            <h2 className="text-4xl font-black tracking-tight text-brand-dark mt-2 lg:mt-0 mb-1">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-brand-dark mt-2 lg:mt-0 mb-1">
               Acceso al portal
             </h2>
-            <p className="text-sm text-brand-carbon/60 font-medium mb-10">
+            <p className="text-xs sm:text-sm text-brand-carbon/60 font-medium mb-8 sm:mb-10">
               Credenciales corporativas de alta seguridad
             </p>
 
@@ -205,7 +205,7 @@ export function Login() {
                     placeholder="ejemplo@empresa.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-4 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none sm:text-sm sm:leading-6"
+                    className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 sm:py-4 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none text-sm sm:leading-6"
                   />
                   {/* Línea decorativa que se expande al enfocar el campo */}
                   <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
@@ -234,7 +234,7 @@ export function Login() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-4 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none sm:text-sm sm:leading-6"
+                    className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 sm:py-4 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none text-sm sm:leading-6"
                   />
                   <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
                 </div>

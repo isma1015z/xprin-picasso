@@ -195,10 +195,10 @@ export function Registro() {
               <span className="text-2xl font-black text-brand-dark tracking-tight">XPRIN</span>
             </Link>
 
-            <h2 className="text-4xl font-black tracking-tight text-brand-dark mt-3 lg:mt-0 mb-1">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-brand-dark mt-3 lg:mt-0 mb-1">
               Crea tu cuenta corporativa
             </h2>
-            <p className="text-sm text-brand-carbon/60 font-medium mb-10">
+            <p className="text-xs sm:text-sm text-brand-carbon/60 font-medium mb-8 sm:mb-10">
               Solicitud de acceso a producción
             </p>
 
@@ -304,15 +304,15 @@ export function Registro() {
               <div className="mt-8 pt-6 border-t border-brand-gray/20">
                 {/* Tarjeta con Glassmorphism y Elevación Industrial */}
                 <div className="bg-brand-white/50 backdrop-blur-sm rounded-xl p-6 border border-brand-gray/10 hover:border-brand-red/20 transition-all group/card shadow-sm">
-                  <div className="flex items-center justify-between mb-5">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-5 gap-4">
                     <div className="flex items-center gap-4">
                       {/* Logo X Circular con efecto Glow */}
-                      <div className="w-12 h-12 rounded-full bg-brand-red flex items-center justify-center shadow-lg shadow-brand-red/30 group-hover/card:scale-110 transition-transform">
-                        <span className="text-white font-black text-2xl leading-none">X</span>
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-red flex items-center justify-center shadow-lg shadow-brand-red/30 group-hover/card:scale-110 transition-transform flex-shrink-0">
+                        <span className="text-white font-black text-xl sm:text-2xl leading-none">X</span>
                       </div>
                       <div>
-                        <h3 className="font-black text-brand-dark text-lg tracking-tight uppercase">XPRIN PRO</h3>
-                        <p className="text-brand-carbon/40 text-[10px] font-bold tracking-widest uppercase">Industrial Standard Subscription</p>
+                        <h3 className="font-black text-brand-dark text-base sm:text-lg tracking-tight uppercase">XPRIN PRO</h3>
+                        <p className="text-brand-carbon/40 text-[9px] sm:text-[10px] font-bold tracking-widest uppercase">Industrial Standard Subscription</p>
                       </div>
                     </div>
                   </div>

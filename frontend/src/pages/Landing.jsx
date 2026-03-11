@@ -35,19 +35,19 @@ export function Landing() {
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#E41C24_1px,transparent_1px)] [background-size:32px_32px] pointer-events-none"></div>
 
         {/* LOGO CON ANIMACIÓN DE ENTRADA */}
-        <div className="relative z-10 animate-fade-in-up">
-          <h1 className="text-9xl font-black text-brand-white tracking-tighter mb-2 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+        <div className="relative z-10 animate-fade-in-up px-6">
+          <h1 className="text-6xl sm:text-8xl lg:text-9xl font-black text-brand-white tracking-tighter mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
             XPRIN<span className="text-brand-red animate-pulse">.</span>
           </h1>
-          <p className="text-xl font-medium text-brand-gray tracking-[0.4em] mb-12 uppercase opacity-80 max-w-2xl mx-auto leading-relaxed">
-            Soluciones de Impresión <br /> de Alta Precisión
+          <p className="text-lg sm:text-xl font-medium text-brand-gray tracking-[0.2em] sm:tracking-[0.4em] mb-12 uppercase opacity-80 max-w-2xl mx-auto leading-relaxed">
+            Soluciones de Impresión <br className="hidden sm:block" /> de Alta Precisión
           </p>
         </div>
 
-        <div className="flex gap-8 relative z-10">
+        <div className="flex flex-col sm:flex-row items-center sm:justify-center gap-4 sm:gap-8 relative z-10 w-full max-w-xs sm:max-w-none px-6">
           <button
             onClick={() => handleNavigate('/login')}
-            className="group relative px-10 py-4 bg-brand-red text-white font-bold rounded-sm overflow-hidden transition-all duration-300 hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(228,28,36,0.3)] hover:shadow-[0_0_30px_rgba(228,28,36,0.5)]"
+            className="group relative px-6 py-4 sm:px-10 sm:py-4 bg-brand-red text-white font-bold rounded-sm overflow-hidden transition-all duration-300 hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(228,28,36,0.3)] hover:shadow-[0_0_30px_rgba(228,28,36,0.5)] w-full sm:w-auto"
           >
             <span className="relative z-10">ACCEDER AL PORTAL</span>
             <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] -translate-x-full group-hover:animate-shimmer"></div>
@@ -55,14 +55,14 @@ export function Landing() {
 
           <button
             onClick={() => handleNavigate('/registro')}
-            className="group relative px-10 py-4 bg-transparent border border-brand-white/30 text-brand-white font-bold rounded-sm overflow-hidden transition-all duration-300 hover:border-brand-white hover:scale-105 active:scale-95 backdrop-blur-sm"
+            className="group relative px-6 py-4 sm:px-10 sm:py-4 bg-transparent border border-brand-white/30 text-brand-white font-bold rounded-sm overflow-hidden transition-all duration-300 hover:border-brand-white hover:scale-105 active:scale-95 backdrop-blur-sm w-full sm:w-auto"
           >
             <span className="relative z-10 uppercase tracking-wider">Solicitar Acceso</span>
             <div className="absolute inset-0 bg-brand-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
           </button>
         </div>
 
-        <p className="absolute bottom-8 text-brand-gray text-[10px] tracking-widest opacity-30 font-medium uppercase">
+        <p className="absolute bottom-8 text-brand-gray text-[8px] sm:text-[10px] tracking-widest opacity-30 font-medium uppercase px-4 text-center">
           v1.0.4 Picasso Engine — Industrial Standard
         </p>
       </div>
