@@ -7,7 +7,7 @@ import os, uuid, json, traceback
 
 load_dotenv()
 
-app = FastAPI(title="XPRIN-Picasso API", version="0.8.2")
+app = FastAPI(title="XPRIN-Picasso API", version="0.8.3")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 @app.exception_handler(Exception)
@@ -32,7 +32,7 @@ def quitar_fondo(imagen_bytes: bytes) -> bytes:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.8.2"}
+    return {"status": "ok", "version": "0.8.3"}
 
 
 # ── POST /detect-color-zones ──────────────────────────────────────────────────
@@ -115,6 +115,11 @@ async def export_pdf(
 
     sufijo   = "_preview.pdf" if preview else "_spots.pdf"
     pdf_path = os.path.join(EXPORT_DIR, f"{proyecto_id}{sufijo}")
+
+    # Guardar JSON completo del proyecto para debug/CLI
+    json_debug = os.path.join(EXPORT_DIR, f"{proyecto_id}_proyecto.json")
+    with open(json_debug, "w", encoding="utf-8") as f:
+        json.dump(proyecto, f, ensure_ascii=False, indent=2)
 
     try:
         generar_pdf(
