@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { Upload, Sun, Moon, FileDown, ChevronDown, LogOut, Menu, X } from 'lucide-react'
 import { useStore } from '../store'
 import { DetectionSettings } from './DetectionSettings'
-import { API_URL } from '../config'
+import { getDetectedImageUrl } from '../detectedImageUrl'
 import lapiz from '../assets/images/lapiz.png'
 import lapizBlanco from '../assets/images/lapizBlanco.png'
 import logo from '../assets/images/Logo_Negro.png'
@@ -43,10 +43,11 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
         throw new Error(detail)
       }
       const data = await res.json()
+      const detectedUrl = getDetectedImageUrl(data, localUrl)
       setProyecto({
         proyectoId: data.id,
         nombre: data.nombre,
-        imagenUrl: localUrl,
+        imagenUrl: detectedUrl,
         ancho: data.documento.ancho,
         alto: data.documento.alto,
         capas: data.capas,
