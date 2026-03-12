@@ -17,66 +17,80 @@ from PIL import Image
 # UTILS SVG A PDF
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _svg_path_to_pdf(svg_d, tile_size):
-    """Convierte un string 'd' de SVG a comandos raw de PDF, invirtiendo Y."""
+def _svg_path_to_pdf(svg_d, tile_size, viewbox_width=100.0, viewbox_height=100.0):
+    """Convierte un string 'd' de SVG a comandos raw de PDF en el tile (0..tile_size)."""
+    # Escala de unidades SVG → tile de patrón PDF
+    if viewbox_width <= 0: viewbox_width = 100.0
+    if viewbox_height <= 0: viewbox_height = 100.0
+    sx = tile_size / viewbox_width
+    sy = tile_size / viewbox_height
+
     # Regex para extraer comandos y sus argumentos
     tokens = re.findall(r'([A-Za-z])|(-?\d*\.?\d+)', svg_d)
-    
     pdf = []
     curr_x, curr_y = 0.0, 0.0
     start_x, start_y = 0.0, 0.0
-    
+
     i = 0
     while i < len(tokens):
         cmd = tokens[i][0]
         if not cmd: # Si es un número sin comando previo, repetir último comando
-            i += 1; continue 
-        
+            i += 1; continue
+
         # Recoger argumentos
         args = []
         i += 1
         while i < len(tokens) and tokens[i][1]:
             args.append(float(tokens[i][1]))
             i += 1
-            
-        def _to_pdf_y(y): return tile_size - y
+
+        def _to_pdf_y(y):
+            return tile_size - y
+
+        def _to_x(x):
+            return x * sx
+
+        def _to_y(y):
+            return y * sy
 
         if cmd == 'M':
-            curr_x, curr_y = args[0], args[1]
+            curr_x, curr_y = _to_x(args[0]), _to_y(args[1])
             start_x, start_y = curr_x, curr_y
             pdf.append(f"{curr_x:.3f} {_to_pdf_y(curr_y):.3f} m")
         elif cmd == 'm':
-            curr_x += args[0]; curr_y += args[1]
+            curr_x += _to_x(args[0]); curr_y += _to_y(args[1])
             start_x, start_y = curr_x, curr_y
             pdf.append(f"{curr_x:.3f} {_to_pdf_y(curr_y):.3f} m")
         elif cmd == 'L':
-            curr_x, curr_y = args[0], args[1]
+            curr_x, curr_y = _to_x(args[0]), _to_y(args[1])
             pdf.append(f"{curr_x:.3f} {_to_pdf_y(curr_y):.3f} l")
         elif cmd == 'l':
-            curr_x += args[0]; curr_y += args[1]
+            curr_x += _to_x(args[0]); curr_y += _to_y(args[1])
             pdf.append(f"{curr_x:.3f} {_to_pdf_y(curr_y):.3f} l")
         elif cmd == 'H':
-            curr_x = args[0]
+            curr_x = _to_x(args[0])
             pdf.append(f"{curr_x:.3f} {_to_pdf_y(curr_y):.3f} l")
         elif cmd == 'h':
-            curr_x += args[0]
+            curr_x += _to_x(args[0])
             pdf.append(f"{curr_x:.3f} {_to_pdf_y(curr_y):.3f} l")
         elif cmd == 'V':
-            curr_y = args[0]
+            curr_y = _to_y(args[0])
             pdf.append(f"{curr_x:.3f} {_to_pdf_y(curr_y):.3f} l")
         elif cmd == 'v':
-            curr_y += args[0]
+            curr_y += _to_y(args[0])
             pdf.append(f"{curr_x:.3f} {_to_pdf_y(curr_y):.3f} l")
         elif cmd == 'C':
-            pdf.append(f"{args[0]:.3f} {_to_pdf_y(args[1]):.3f} {args[2]:.3f} {_to_pdf_y(args[3]):.3f} {args[4]:.3f} {_to_pdf_y(args[5]):.3f} c")
-            curr_x, curr_y = args[4], args[5]
+            x1, y1, x2, y2, x, y = _to_x(args[0]), _to_y(args[1]), _to_x(args[2]), _to_y(args[3]), _to_x(args[4]), _to_y(args[5])
+            pdf.append(f"{x1:.3f} {_to_pdf_y(y1):.3f} {x2:.3f} {_to_pdf_y(y2):.3f} {x:.3f} {_to_pdf_y(y):.3f} c")
+            curr_x, curr_y = x, y
         elif cmd == 'c':
-            pdf.append(f"{curr_x+args[0]:.3f} {_to_pdf_y(curr_y+args[1]):.3f} {curr_x+args[2]:.3f} {_to_pdf_y(curr_y+args[3]):.3f} {curr_x+args[4]:.3f} {_to_pdf_y(curr_y+args[5]):.3f} c")
-            curr_x += args[4]; curr_y += args[5]
+            x1, y1, x2, y2, x, y = _to_x(args[0]), _to_y(args[1]), _to_x(args[2]), _to_y(args[3]), _to_x(args[4]), _to_y(args[5])
+            pdf.append(f"{(curr_x+x1):.3f} {_to_pdf_y(curr_y+y1):.3f} {(curr_x+x2):.3f} {_to_pdf_y(curr_y+y2):.3f} {(curr_x+x):.3f} {_to_pdf_y(curr_y+y):.3f} c")
+            curr_x += x; curr_y += y
         elif cmd.lower() == 'z':
             pdf.append("h")
             curr_x, curr_y = start_x, start_y
-            
+
     return "\n".join(pdf)
 
 def _hex_to_rgb(color):
@@ -87,6 +101,89 @@ def _hex_to_rgb(color):
     try:
         return (int(c[0:2], 16) / 255.0, int(c[2:4], 16) / 255.0, int(c[4:6], 16) / 255.0)
     except ValueError: return (0.0, 0.0, 0.0)
+
+
+def _extract_svg_path_data(svg_or_url):
+    """Devuelve una lista de d="..." encontradas en el SVG o URL a SVG."""
+    if not svg_or_url:
+        return []
+
+    raw = str(svg_or_url).strip()
+
+    # Si recibimos un URL/archivo relativo, tratar de cargarlo desde el reproductor local
+    if not raw.startswith("<") and ".svg" in raw:
+        local_path = raw
+        if raw.startswith("/"):
+            local_path = raw.lstrip("/")
+        candidate = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "public", local_path)
+        if os.path.isfile(candidate):
+            try:
+                with open(candidate, "r", encoding="utf-8") as f:
+                    raw = f.read()
+            except Exception:
+                raw = ""
+
+    # Si sigue siendo una ruta válida en el filesystem
+    if os.path.isfile(raw):
+        try:
+            with open(raw, "r", encoding="utf-8") as f:
+                raw = f.read()
+        except Exception:
+            raw = ""
+
+    # A partir del contenido SVG extraer todas las rutas d="..."
+    paths = re.findall(r'd="([^"]+)"', raw)
+
+    # Si no hay etiquetas path, si raw parece ser data path directa, retornarla
+    if not paths and re.match(r'^[MmZzLlHhVvCcSsQqTtAa\s\d\.,\-]+$', raw):
+        paths = [raw]
+
+    return paths
+
+
+def _parse_svg_viewbox(svg_or_url):
+    """Extrae tamaño userSpace del SVG o URL local."""
+    raw = str(svg_or_url or "").strip()
+    if not raw:
+        return 100.0, 100.0
+
+    if not raw.startswith("<") and ".svg" in raw:
+        local_path = raw
+        if raw.startswith("/"):
+            local_path = raw.lstrip("/")
+        candidate = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "public", local_path)
+        if os.path.isfile(candidate):
+            try:
+                with open(candidate, "r", encoding="utf-8") as f:
+                    raw = f.read()
+            except Exception:
+                raw = ""
+
+    if os.path.isfile(raw):
+        try:
+            with open(raw, "r", encoding="utf-8") as f:
+                raw = f.read()
+        except Exception:
+            raw = ""
+
+    m = re.search(r'viewBox=["\']\s*[-+]?(\d*\.?\d+)[,\s]+[-+]?(\d*\.?\d+)[,\s]+[-+]?(\d*\.?\d+)[,\s]+[-+]?(\d*\.?\d+)["\']', raw, flags=re.I)
+    if m:
+        try:
+            w = float(m.group(3)); h = float(m.group(4))
+            if w > 0 and h > 0: return w, h
+        except Exception:
+            pass
+
+    m2 = re.search(r'width=["\']\s*(\d*\.?\d+)', raw, flags=re.I)
+    m3 = re.search(r'height=["\']\s*(\d*\.?\d+)', raw, flags=re.I)
+    if m2 and m3:
+        try:
+            w = float(m2.group(1)); h = float(m3.group(1))
+            if w > 0 and h > 0: return w, h
+        except Exception:
+            pass
+
+    return 100.0, 100.0
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # GENERADOR PDF
@@ -173,10 +270,13 @@ def generar_pdf(datos, imagen_path, output_path, preview=False, embed_imagen=Tru
                 if not pb.strip(): continue
                 cs += b"q\n"
                 if not preview: cs += b"/GSOP gs\n"
-                
+
                 if p_key:
+                    # Clippear la forma y rellenar con el patrón (solo se ve dentro del shape).
+                    cs += pb + b"W n\n"
                     cs += b"/Pattern cs\n"
                     cs += f"/{p_key} scn\n".encode()
+                    cs += f"0 0 {ancho} {alto} re f\n".encode()
                 else:
                     cs += f"{cs_name} cs\n".encode()
                     if preview:
@@ -184,8 +284,9 @@ def generar_pdf(datos, imagen_path, output_path, preview=False, embed_imagen=Tru
                         cs += f"{r:.4f} {g:.4f} {b:.4f} scn\n".encode()
                     else:
                         cs += f"{opacidad:.4f} scn\n".encode()
-                
-                cs += pb + b"f*\nQ\n\n"
+                    cs += pb + b"f*\n"
+
+                cs += b"Q\n\n"
 
     # ── Armar Objetos ──────────────────────────────────────────────────────────
     obj_bodies = {}
@@ -202,9 +303,20 @@ def generar_pdf(datos, imagen_path, output_path, preview=False, embed_imagen=Tru
     # Pattern Objects
     for p_key, p_data in PATTERN_OBJS.items():
         sz = p_data["size"]; ch = p_data["channel"]
-        d_match = re.search(r'd="([^"]+)"', p_data["svg"])
-        commands = _svg_path_to_pdf(d_match.group(1), sz) if d_match else ""
-        
+        path_list = _extract_svg_path_data(p_data.get("svg", ""))
+        view_w, view_h = _parse_svg_viewbox(p_data.get("svg", ""))
+        commands_list = []
+
+        for d in path_list:
+            if not d.strip():
+                continue
+            commands_list.append(_svg_path_to_pdf(d, sz, view_w, view_h))
+
+        commands = "\n".join(commands_list)
+        if not commands.strip():
+            # Fallback: dibujar la forma completa del tile si no se detectó path válido.
+            commands = f"0 0 m {sz:.3f} 0 l {sz:.3f} {sz:.3f} l 0 {sz:.3f} l h"
+
         # El comando scn dentro del patrón usa el color del spot
         p_stream = f"q\n/CS_{ch['id'].replace(' ', '_')} cs\n1.0 scn\n{commands}\nf*\nQ".encode()
         
