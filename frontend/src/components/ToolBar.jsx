@@ -6,7 +6,7 @@ import { useStore } from '../store'
 import { DetectionSettings } from './DetectionSettings'
 import { getDetectedImageUrl } from '../detectedImageUrl'
 
-const API = '/api'
+import { API_URL } from '../config'
 
 export function ToolBar() {
   const fileInputRef = useRef(null)
@@ -29,7 +29,7 @@ export function ToolBar() {
       // buildDetectionForm() incluye todos los params v7 del store
       const formData = buildDetectionForm(file)
 
-      const res = await fetch(`${API}/detect-color-zones`, {
+      const res = await fetch(`${API_URL}/detect-color-zones`, {
         method: 'POST',
         body: formData,
       })
@@ -75,7 +75,7 @@ export function ToolBar() {
     setError(null)
 
     try {
-      const res = await fetch(`${API}/export-pdf`, {
+      const res = await fetch(`${API_URL}/export-pdf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(getProyectoJSON()),

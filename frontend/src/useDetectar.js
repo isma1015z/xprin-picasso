@@ -15,7 +15,7 @@ export function useDetectar() {
     setError(null)
     try {
       const localUrl = URL.createObjectURL(file)
-      const res = await fetch('/api/detect-color-zones', {
+      const res = await fetch(`${API_URL}/detect-color-zones`, {
         method: 'POST',
         body: buildDetectionForm(file),
       })
