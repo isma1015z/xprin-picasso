@@ -85,32 +85,48 @@ async def detect_color_zones(
 # ── POST /export-pdf ──────────────────────────────────────────────────────────
 @app.post("/export-pdf")
 async def export_pdf(
-    proyecto:     dict,
-    preview:      bool = False,
-    embed_imagen: bool = True,
+    proyecto:     str = Form(...),
+    preview:      bool = Form(False),
+    embed_imagen: bool = Form(True),
+    imagen:       UploadFile = File(None),
 ):
     from json_to_pdf import generar_pdf
 
-    proyecto_id = proyecto.get("id", "")
-    nombre      = proyecto.get("nombre", "proyecto")
+    proyecto_dict = json.loads(proyecto)
+    proyecto_id   = proyecto_dict.get("id", "")
+    nombre        = proyecto_dict.get("nombre", "proyecto")
 
-    sidecar     = os.path.join(IMG_DIR, f"{proyecto_id}.json")
     imagen_path = None
-    if os.path.isfile(sidecar):
-        with open(sidecar) as f:
-            imagen_path = json.load(f).get("imagen_path")
+    temp_imagen = None
 
-    if not imagen_path or not os.path.isfile(imagen_path):
-        for ext in (".png", ".jpg", ".jpeg", ".webp"):
-            c = os.path.join(IMG_DIR, f"{proyecto_id}{ext}")
-            if os.path.isfile(c):
-                imagen_path = c; break
+    # 1. Si viene una imagen en el request, usarla (prioridad alta para persistencia/cloud)
+    if imagen:
+        print(f"  [EXPORT] Usando imagen subida en el request para {proyecto_id}")
+        contenido = await imagen.read()
+        if contenido:
+            temp_imagen = os.path.join(IMG_DIR, f"temp_{proyecto_id}_{uuid.uuid4().hex[:6]}.png")
+            with open(temp_imagen, "wb") as f:
+                f.write(contenido)
+            imagen_path = temp_imagen
+
+    # 2. Si no viene imagen, buscarla en el disco (comportamiento legacy/local)
+    if not imagen_path:
+        sidecar = os.path.join(IMG_DIR, f"{proyecto_id}.json")
+        if os.path.isfile(sidecar):
+            with open(sidecar) as f:
+                imagen_path = json.load(f).get("imagen_path")
+
+        if not imagen_path or not os.path.isfile(imagen_path):
+            for ext in (".png", ".jpg", ".jpeg", ".webp"):
+                c = os.path.join(IMG_DIR, f"{proyecto_id}{ext}")
+                if os.path.isfile(c):
+                    imagen_path = c; break
 
     if embed_imagen and (not imagen_path or not os.path.isfile(imagen_path)):
         raise HTTPException(status_code=404,
-            detail=f"Imagen no encontrada para {proyecto_id}.")
+            detail=f"Imagen no encontrada para {proyecto_id}. Súbela de nuevo.")
 
-    if not [c for c in proyecto.get("capas", []) if c.get("spot")]:
+    if not [c for c in proyecto_dict.get("capas", []) if c.get("spot")]:
         raise HTTPException(status_code=400, detail="No hay capas con spot asignado.")
 
     sufijo   = "_preview.pdf" if preview else "_spots.pdf"
@@ -119,11 +135,11 @@ async def export_pdf(
     # Guardar JSON completo del proyecto para debug/CLI
     json_debug = os.path.join(EXPORT_DIR, f"{proyecto_id}_proyecto.json")
     with open(json_debug, "w", encoding="utf-8") as f:
-        json.dump(proyecto, f, ensure_ascii=False, indent=2)
+        json.dump(proyecto_dict, f, ensure_ascii=False, indent=2)
 
     try:
         generar_pdf(
-            proyecto, imagen_path, pdf_path,
+            proyecto_dict, imagen_path, pdf_path,
             preview=preview, conservar_ps=False, embed_imagen=embed_imagen,
         )
     except RuntimeError as e:
@@ -131,6 +147,11 @@ async def export_pdf(
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error generando PDF: {e}")
+    finally:
+        # Si creamos un archivo temporal para la imagen, borrarlo después de generar el PDF
+        if temp_imagen and os.path.isfile(temp_imagen):
+            try: os.remove(temp_imagen)
+            except: pass
 
     if not os.path.isfile(pdf_path):
         raise HTTPException(status_code=500, detail="PDF no generado.")
