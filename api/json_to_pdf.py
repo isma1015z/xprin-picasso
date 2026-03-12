@@ -1,22 +1,13 @@
 """
-json_to_pdf.py  —  XPRIN-Picasso  (v6.7 — imagen original + solo spots)
+json_to_pdf.py  —  XPRIN-Picasso  (v7.2)
 ---------------------------------------------------------------
-Idea: eliminar las capas CMYK vectorizadas del PDF.
-
-  El RIP recibe:
-    1. Imagen original RGB como fondo  → el RIP aplica su propio perfil de color
-    2. Spots UV encima con overprint   → W1, W2, TEXTURE
-
-  Sin capas CMYK vectorizadas:
-    - No hay conversión RGB→CMYK nuestra que distorsione los colores
-    - El RIP procesa la imagen directamente con su perfil ICC
-    - Los colores salen fieles al original
-
-Orden del content stream:
-  1. Fondo blanco
-  2. Imagen RGB   ← el RIP la gestiona con su perfil propio
-  3. Spots UV     ← al final con /OP true /op true /OPM 1
-  (sin capas CMYK vectorizadas)
+FIXES v7.2:
+  - ELIMINADO y-flip: el detector ya genera coords PDF (Y=0=abajo)
+    Canvas.jsx hace alto-y para pantalla, PDF NO debe hacerlo
+  - Nombre Separation = solo ch['id'] + label limpio (sin %)
+    El inkAmount se aplica como valor scn, no en el nombre
+  - ColorSpace key = "CS" + id limpio (igual que el PDF de referencia)
+  - % en nombres PDF escapado con #25 por si acaso
 """
 
 import io
@@ -24,7 +15,6 @@ import json
 import os
 import sys
 import argparse
-import math
 
 try:
     from PIL import Image
@@ -32,91 +22,61 @@ try:
 except ImportError:
     HAS_PILLOW = False
 
-
-SPOTS_ORDEN = ["w1", "w2", "texture"]
-
-SPOT_NOMBRE_PDF = {
-    "w1":      "W1",
-    "w2":      "W2",
-    "texture": "TEXTURE",
-}
-
-SPOT_CHANNELS = {
-    "w1":      {"nombre": "W1",      "preview_rgb": (0.63, 0.63, 0.69)},
-    "w2":      {"nombre": "W2",      "preview_rgb": (0.48, 0.55, 0.87)},
-    "texture": {"nombre": "TEXTURE", "preview_rgb": (0.94, 0.71, 0.16)},
-}
-
-MAX_IMG_PX   = 2500
-GCR_STRENGTH = 0.85
-TAC_LIMIT    = 2.80
+MAX_IMG_PX = 2500
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# COLORES (mantenido por si se necesita en preview)
+# HELPERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _hex_to_rgb(color):
-    if not color:
-        return (0.0, 0.0, 0.0)
-    c = color.strip().lower().lstrip("#")
+def _pdf_name(text: str) -> str:
+    """Escapa caracteres reservados en nombres PDF."""
+    result = []
+    for ch in str(text):
+        if ch in ('%', '#', '/', ' ', '(', ')', '<', '>', '[', ']', '{', '}'):
+            result.append(f"#{ord(ch):02X}")
+        else:
+            result.append(ch)
+    return "".join(result)
+
+
+def _separation_name(ch: dict) -> str:
+    """
+    Nombre del canal Separation tal como lo verá el RIP.
+    Formato: ID o ID_Label  (sin porcentaje — el inkAmount va como valor scn).
+    Ejemplos: W1, W2, SPOT_1, SPOT_1_Brillo
+    """
+    lbl = (ch.get("label") or "").strip()
+    base = ch["id"]
+    name = f"{base}_{lbl}" if lbl else base
+    return _pdf_name(name)
+
+
+def _cs_key(ch: dict) -> str:
+    """Clave del ColorSpace en el diccionario Resources. Ej: CSSPOT_1"""
+    return "CS" + _pdf_name(ch["id"])
+
+
+def _hex_to_rgb_float(color: str):
+    c = (color or "").strip().lower().lstrip("#")
     if len(c) == 3:
-        c = "".join(ch * 2 for ch in c)
+        c = "".join(x * 2 for x in c)
     if len(c) != 6:
-        return (0.0, 0.0, 0.0)
+        return (0.63, 0.63, 0.69)
     try:
         return (int(c[0:2], 16) / 255.0,
                 int(c[2:4], 16) / 255.0,
                 int(c[4:6], 16) / 255.0)
     except ValueError:
-        return (0.0, 0.0, 0.0)
+        return (0.63, 0.63, 0.69)
 
 
-def _srgb_to_linear(v):
-    v = max(0.0, min(1.0, v))
-    if v <= 0.04045:
-        return v / 12.92
-    return ((v + 0.055) / 1.055) ** 2.4
-
-
-def _hex_to_cmyk(color):
-    if not color:
-        return (0.0, 0.0, 0.0, 1.0)
-    r, g, b = _hex_to_rgb(color)
-    if r >= 0.999 and g >= 0.999 and b >= 0.999:
-        return (0.0, 0.0, 0.0, 0.0)
-    if r <= 0.001 and g <= 0.001 and b <= 0.001:
-        return (0.0, 0.0, 0.0, 1.0)
-    rl = _srgb_to_linear(r)
-    gl = _srgb_to_linear(g)
-    bl = _srgb_to_linear(b)
-    c = 1.0 - rl
-    m = 1.0 - gl
-    y = 1.0 - bl
-    achrom = min(c, m, y)
-    k_raw = achrom ** (1.0 / 1.4)
-    k     = k_raw * GCR_STRENGTH
-    if achrom > 0.001:
-        gcr_fraction = k / achrom
-        c = c - achrom * gcr_fraction
-        m = m - achrom * gcr_fraction
-        y = y - achrom * gcr_fraction
-    c = max(0.0, min(1.0, c))
-    m = max(0.0, min(1.0, m))
-    y = max(0.0, min(1.0, y))
-    k = max(0.0, min(1.0, k))
-    tac = c + m + y + k
-    if tac > TAC_LIMIT:
-        scale = TAC_LIMIT / tac
-        c *= scale; m *= scale; y *= scale; k *= scale
-    return (round(c, 4), round(m, 4), round(y, 4), round(k, 4))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# PATHS
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _forma_a_pdf_bytes(forma):
+def _forma_a_pdf_bytes(forma) -> bytes:
+    """
+    Convierte forma a operadores PDF.
+    IMPORTANTE: las coordenadas del detector ya están en espacio PDF
+    (Y=0 en la base). NO se hace flip — el código que funciona tampoco lo hacía.
+    """
     partes = []
     for cmd in forma:
         t = cmd.get("tipo", "")
@@ -134,10 +94,6 @@ def _forma_a_pdf_bytes(forma):
             partes.append("h\n")
     return "".join(partes).encode("ascii")
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# IMAGEN
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def _abrir_sobre_blanco(imagen_path):
     img = Image.open(imagen_path)
@@ -168,38 +124,88 @@ def _preparar_jpeg(imagen_path):
     return buf.getvalue(), iw, ih
 
 
+# ── Migración backward compat ─────────────────────────────────────────────────
+
+_VIEJO_A_NUEVO = {"w1": "SPOT_1", "w2": "SPOT_2", "texture": "SPOT_1"}
+
+def _migrar_capas(capas: list) -> list:
+    migradas = []
+    for capa in capas:
+        if isinstance(capa.get("spots"), list):
+            migradas.append(capa)
+            continue
+        spot_viejo = capa.get("spot")
+        spots = []
+        if spot_viejo and spot_viejo in _VIEJO_A_NUEVO:
+            spots = [{"channelId": _VIEJO_A_NUEVO[spot_viejo]}]
+        migradas.append({**capa, "spots": spots})
+    return migradas
+
+
+def _default_spot_channels(capas: list) -> list:
+    ids_vistos = set()
+    channels = []
+    for capa in capas:
+        for sp in (capa.get("spots") or []):
+            cid = sp.get("channelId", "")
+            if cid and cid not in ids_vistos:
+                ids_vistos.add(cid)
+                channels.append({"id": cid, "label": "", "inkAmount": 100, "color": "#a0a0ab"})
+    return channels or [{"id": "SPOT_1", "label": "", "inkAmount": 100, "color": "#a0a0ab"}]
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
-# GENERADOR PDF NATIVO
+# GENERADOR PDF NATIVO — v7.2
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
                        preview=False, embed_imagen=True):
+
     doc   = datos["documento"]
     ancho = int(doc["ancho"])
     alto  = int(doc["alto"])
-    capas = datos.get("capas", [])
 
-    # Solo clasificar por spot — las capas CMYK no se pintan en el PDF
-    por_spot = {s: [] for s in SPOTS_ORDEN}
+    capas         = _migrar_capas(datos.get("capas", []))
+    spot_channels = datos.get("spotChannels") or _default_spot_channels(capas)
+
+    # Agrupar capas visibles por channelId
+    por_canal: dict = {ch["id"]: [] for ch in spot_channels}
     for capa in capas:
         if not capa.get("visible", True):
             continue
-        spot = capa.get("spot")
-        if spot in por_spot:
-            por_spot[spot].append(capa)
-        # capas sin spot asignado → se ignoran (la imagen las representa)
+        for sp in (capa.get("spots") or []):
+            cid = sp.get("channelId", "")
+            if cid in por_canal:
+                por_canal[cid].append(capa)
 
-    OBJ_CATALOG  = 1
-    OBJ_PAGES    = 2
-    OBJ_PAGE     = 3
-    OBJ_GSOP     = 4
-    OBJ_TINT_W1  = 5
-    OBJ_TINT_W2  = 6
-    OBJ_TINT_TEX = 7
-    OBJ_CONTENT  = 8
-    OBJ_IMAGE    = 9
+    canales_activos = [ch for ch in spot_channels if por_canal.get(ch["id"])]
 
-    TINT_IDS = {"w1": OBJ_TINT_W1, "w2": OBJ_TINT_W2, "texture": OBJ_TINT_TEX}
+    if not canales_activos:
+        raise RuntimeError("No hay capas con spot asignado para generar el PDF.")
+
+    # ── IDs de objetos PDF ────────────────────────────────────────────────────
+    #  1  = Catalog
+    #  2  = Pages
+    #  3  = Page
+    #  4  = ExtGState (overprint)
+    #  5…4+N = Tint functions
+    #  5+N   = Content stream
+    #  6+N   = Image (si existe)
+
+    N = len(canales_activos)
+    OBJ_CATALOG = 1
+    OBJ_PAGES   = 2
+    OBJ_PAGE    = 3
+    OBJ_GSOP    = 4
+    tint_ids    = {ch["id"]: 5 + i for i, ch in enumerate(canales_activos)}
+    OBJ_CONTENT = 5 + N
+    OBJ_IMAGE   = 5 + N + 1
+
+    # ── Imagen ────────────────────────────────────────────────────────────────
+    jpeg_bytes = None
+    img_w = img_h = 0
+    if embed_imagen and imagen_path and HAS_PILLOW:
+        jpeg_bytes, img_w, img_h = _preparar_jpeg(imagen_path)
 
     # ── Content stream ─────────────────────────────────────────────────────────
     cs = bytearray()
@@ -207,25 +213,18 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
     # 1. Fondo blanco
     cs += f"q\n1 1 1 rg\n0 0 {ancho} {alto} re\nf\nQ\n\n".encode()
 
-    # 2. Imagen original RGB — el RIP la gestiona con su propio perfil
-    jpeg_bytes = None
-    img_w = img_h = 0
-    if embed_imagen and imagen_path and HAS_PILLOW:
-        jpeg_bytes, img_w, img_h = _preparar_jpeg(imagen_path)
+    # 2. Imagen original RGB
     if jpeg_bytes:
         cs += f"q\n{ancho} 0 0 {alto} 0 0 cm\n/Im0 Do\nQ\n\n".encode()
 
-    # 3. Spots UV — al final, overprint ON
-    #    Sin capas CMYK entre medio: el RIP ve imagen limpia + spots puros
-    for spot in SPOTS_ORDEN:
-        lista = por_spot[spot]
-        if not lista:
-            continue
-        ch      = SPOT_CHANNELS[spot]
-        cs_name = f"/CS{ch['nombre']}"
+    # 3. Spots UV — overprint ON
+    for ch in canales_activos:
+        cid   = ch["id"]
+        key   = _cs_key(ch)       # ej. CSSPOT_1
+        lista = por_canal[cid]
+        ink   = max(0.0, min(1.0, ch.get("inkAmount", 100) / 100.0))
 
         for capa in lista:
-            opacidad = max(0.0, min(1.0, float(capa.get("opacidad", 1.0))))
             for zona in capa.get("zonas", []):
                 pb = _forma_a_pdf_bytes(zona.get("forma", []))
                 if not pb.strip():
@@ -233,31 +232,30 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
                 cs += b"q\n"
                 if not preview:
                     cs += b"/GSOP gs\n"
-                cs += f"{cs_name} cs\n".encode()
+                cs += f"/{key} cs\n".encode()
                 if preview:
-                    r, g, b = ch["preview_rgb"]
+                    r, g, b = _hex_to_rgb_float(ch.get("color", "#a0a0ab"))
                     cs += f"{r:.4f} {g:.4f} {b:.4f} scn\n".encode()
                 else:
-                    cs += f"{opacidad:.4f} scn\n".encode()
+                    cs += f"{ink:.4f} scn\n".encode()
                 cs += pb
-                cs += b"f*\nQ\n\n"
+                cs += b"f\nQ\n\n"
 
     content_bytes = bytes(cs)
 
     # ── Objetos PDF ────────────────────────────────────────────────────────────
-    obj_bodies = {}
+    obj_bodies: dict = {}
 
-    # Tint function: { pop 0 0 0 0 } — alternate DeviceCMYK → invisible en visores
+    # Tint functions
     tint_stream = b"{ pop 0 0 0 0 }"
-    for key, oid in TINT_IDS.items():
-        hdr = (
-            f"<< /FunctionType 4 /Domain [0.0 1.0]"
-            f" /Range [0.0 1.0 0.0 1.0 0.0 1.0 0.0 1.0]"
-            f" /Length {len(tint_stream)} >>\nstream\n"
-        ).encode()
-        obj_bodies[oid] = hdr + tint_stream + b"\nendstream"
+    tint_hdr = (
+        f"<< /FunctionType 4 /Domain [0.0 1.0]"
+        f" /Range [0.0 1.0 0.0 1.0 0.0 1.0 0.0 1.0]"
+        f" /Length {len(tint_stream)} >>\nstream\n"
+    ).encode()
+    for ch in canales_activos:
+        obj_bodies[tint_ids[ch["id"]]] = tint_hdr + tint_stream + b"\nendstream"
 
-    # Solo GSOP — ya no necesitamos GSNOP (sin capas CMYK)
     obj_bodies[OBJ_GSOP] = b"<< /Type /ExtGState /OP true /op true /OPM 1 >>"
 
     obj_bodies[OBJ_CONTENT] = (
@@ -274,16 +272,17 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
         ).encode()
         obj_bodies[OBJ_IMAGE] = img_hdr + jpeg_bytes + b"\nendstream"
 
+    # ColorSpace — /Separation con nombre limpio para el RIP
     cs_entries = []
-    for key in SPOTS_ORDEN:
-        ch   = SPOT_CHANNELS[key]
-        name = f"CS{ch['nombre']}"
+    for ch in canales_activos:
+        key  = _cs_key(ch)              # ej. CSSPOT_1
+        name = _separation_name(ch)     # ej. SPOT_1 o SPOT_1_Brillo
+        tid  = tint_ids[ch["id"]]
         if preview:
-            cs_entries.append(f"      /{name} [/DeviceRGB]")
+            cs_entries.append(f"      /{key} [/DeviceRGB]")
         else:
-            tid = TINT_IDS[key]
             cs_entries.append(
-                f"      /{name} [/Separation /{ch['nombre']} /DeviceCMYK {tid} 0 R]"
+                f"      /{key} [/Separation /{name} /DeviceCMYK {tid} 0 R]"
             )
 
     xobj_block = f"\n      /XObject << /Im0 {OBJ_IMAGE} 0 R >>" if jpeg_bytes else ""
@@ -336,6 +335,14 @@ def generar_pdf_nativo(datos, imagen_path=None, output_path="output.pdf",
     with open(output_path, "wb") as f:
         f.write(buf)
 
+    # Log
+    area_total = ancho * alto or 1
+    print(f"  [PDF v7.2] {len(canales_activos)} spot(s), {os.path.getsize(output_path)//1024} KB")
+    for ch in canales_activos:
+        lista = por_canal[ch["id"]]
+        pct   = 100 * sum(c.get("area_px", 0) for c in lista) / area_total
+        print(f"    /{_separation_name(ch):<25}  {len(lista):>2} capa(s)  {pct:.1f}%")
+
     return output_path
 
 
@@ -353,16 +360,16 @@ def generar_pdf(datos, imagen_path, output_path, preview=False,
 
 def main():
     parser = argparse.ArgumentParser(
-        description="XPRIN-Picasso v6.7 — JSON → PDF imagen + spots UV"
+        description="XPRIN-Picasso v7.2 — JSON → PDF imagen + spots UV dinámicos"
     )
     parser.add_argument("json")
-    parser.add_argument("--imagen",    "-i")
-    parser.add_argument("--output",    "-o")
-    parser.add_argument("--preview",         action="store_true")
-    parser.add_argument("--sin-imagen",      action="store_true")
+    parser.add_argument("--imagen", "-i")
+    parser.add_argument("--output", "-o")
+    parser.add_argument("--preview",    action="store_true")
+    parser.add_argument("--sin-imagen", action="store_true")
     args = parser.parse_args()
 
-    print(f"\n{'='*60}\n  XPRIN-Picasso — JSON → PDF  (v6.7)\n{'='*60}")
+    print(f"\n{'='*60}\n  XPRIN-Picasso — JSON → PDF  (v7.2)\n{'='*60}")
 
     with open(args.json, "r", encoding="utf-8") as f:
         datos = json.load(f)
@@ -370,13 +377,10 @@ def main():
     embed_img   = not args.sin_imagen
     imagen_path = args.imagen
     if not imagen_path and embed_img:
-        json_dir   = os.path.dirname(os.path.abspath(args.json))
-        img_ref    = datos.get("imagenBase") or {}
-        img_nombre = img_ref.get("ruta", "") if isinstance(img_ref, dict) else str(img_ref)
-        for cand in [img_nombre,
-                     os.path.join(json_dir, img_nombre),
-                     os.path.join(json_dir, os.path.basename(img_nombre))]:
-            if cand and os.path.isfile(cand):
+        json_dir = os.path.dirname(os.path.abspath(args.json))
+        for ext in (".png", ".jpg", ".jpeg", ".webp"):
+            cand = os.path.join(json_dir, datos.get("id", "imagen") + ext)
+            if os.path.isfile(cand):
                 imagen_path = cand
                 break
 
@@ -386,19 +390,10 @@ def main():
     try:
         generar_pdf(datos, imagen_path, pdf_path,
                     preview=args.preview, embed_imagen=embed_img)
+        print(f"\n[OK] {pdf_path}")
     except Exception as e:
         import traceback; traceback.print_exc()
         sys.exit(1)
-
-    size_kb    = os.path.getsize(pdf_path) / 1024
-    area_total = int(datos["documento"]["ancho"]) * int(datos["documento"]["alto"]) or 1
-    print(f"[OK] {pdf_path}  ({size_kb:.1f} KB)\n")
-    print(f"  {'Canal':<10} {'Capas':>5}  {'Cobertura':>9}")
-    print(f"  {'-'*28}")
-    for spot in SPOTS_ORDEN:
-        lista = [c for c in datos.get("capas", []) if c.get("spot") == spot]
-        pct   = 100 * sum(c.get("area_px", 0) for c in lista) / area_total
-        print(f"  {SPOT_NOMBRE_PDF[spot]:<10} {len(lista):>5}  {pct:>9.2f}%")
 
 
 if __name__ == "__main__":
