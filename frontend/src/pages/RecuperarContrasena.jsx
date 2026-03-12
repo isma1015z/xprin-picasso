@@ -8,12 +8,15 @@ import videoXp from '../assets/images/videoxp_6206.mp4';
 import prueba2 from '../assets/images/prueba2.jpg';
 import logoBlanco from '../assets/images/Logo_Blanco.png';
 import logoColor from '../assets/images/Picsart_26-03-10_10-02-37-011.png';
+import { supabase } from '../lib/supabase';
 
 export function RecuperarContrasena() {
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const video1Ref = useRef(null);
   const video2Ref = useRef(null);
@@ -51,21 +54,38 @@ export function RecuperarContrasena() {
     return () => clearTimeout(timer);
   }, [currentMediaIndex]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      alert("Las contraseñas no coinciden");
+      setError("Las contraseñas no coinciden");
       return;
     }
+    
+    setLoading(true);
+    setError(null);
     console.log('Password reset attempt:', { email, newPassword });
     
-    // Activa la transición
-    setIsPrinting(true);
-    
-    // Simula éxito y redirecciona tras la animación
-    setTimeout(() => {
-       navigate('/login');
-    }, 1500);
+    try {
+      // Lógica de recuperación de Supabase
+      const { error: resetError } = await supabase.auth.updateUser({
+        password: newPassword
+      })
+
+      if (resetError) throw resetError;
+      
+      // Activa la transición
+      setIsPrinting(true);
+      
+      // Redirecciona tras la animación
+      setTimeout(() => {
+         navigate('/login');
+      }, 1500);
+
+    } catch (err) {
+      console.error('Error restableciendo contraseña:', err.message);
+      setError(err.message);
+      setLoading(false);
+    }
   };
 
 
@@ -189,6 +209,12 @@ export function RecuperarContrasena() {
               Ingresa tu correo y nueva contraseña segura
             </p>
 
+            {error && (
+              <div className="mb-4 p-3 bg-brand-red/10 border border-brand-red text-brand-red text-sm rounded">
+                {error}
+              </div>
+            )}
+
             <form className="space-y-6" onSubmit={handleSubmit}>
               {/* Form Group para Email con subrayado animado al hacer focus */}
               <div className="group">
@@ -254,13 +280,16 @@ export function RecuperarContrasena() {
                 </div>
               </div>
 
-              {/* Botón Principal con Efecto Shimmer (Brillo recorriendo el fondo) */}
+              {/* Botón Principal con Efecto Shimmer */}
               <button
                 type="submit"
-                className="group relative flex w-full justify-center rounded-sm bg-brand-red px-3 py-4 text-sm font-bold text-brand-white shadow-xl shadow-brand-red/20 overflow-hidden transition-all hover:scale-[1.02] active:scale-[0.98] outline-none"
+                disabled={loading}
+                className={`group relative flex w-full justify-center rounded-sm bg-brand-red px-3 py-4 text-sm font-bold text-brand-white shadow-xl shadow-brand-red/20 overflow-hidden outline-none transition-all ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:scale-[1.02] active:scale-[0.98]'}`}
               >
-                <span className="relative z-10 tracking-widest">RESTABLECER CONTRASEÑA</span>
-                <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] -translate-x-full group-hover:animate-shimmer"></div>
+                <span className="relative z-10 tracking-widest">
+                  {loading ? 'PROCESANDO...' : 'RESTABLECER CONTRASEÑA'}
+                </span>
+                {!loading && <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] -translate-x-full group-hover:animate-shimmer"></div>}
               </button>
             </form>
 

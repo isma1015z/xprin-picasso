@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 // Importar media de fondo
 import textureBg from '../assets/images/texture-200.png';
@@ -12,11 +13,16 @@ import logoColor from '../assets/images/Picsart_26-03-10_10-02-37-011.png';
 export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  // FASE 1: Efecto carrusel para el fondo
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const video1Ref = useRef(null);
   const video2Ref = useRef(null);
-  const navigate = useNavigate();
 
   // LÓGICA DE CARRUSEL MULTIMEDIA: Controla la secuencia de Textura -> Video 1 -> Video 2 -> Imagen
   useEffect(() => {
@@ -50,9 +56,37 @@ export function Login() {
     return () => clearTimeout(timer);
   }, [currentMediaIndex]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Login attempt:', { email, password });
+    setLoading(true);
+    setError(null);
+    console.log('Login attempt:', { email, password, rememberMe });
+
+    try {
+      // Lógica real de Supabase
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) throw signInError;
+      
+      console.log('Usuario autenticado:', data.user);
+      
+      setIsPrinting(true);
+      setTimeout(() => {
+        // === CAMBIAR RUTA DE REDIRECCIÓN AQUÍ ===
+        // Reemplaza '/editor' por la ruta del fichero al que quieras ir
+        console.log("Login exitoso, redirigiendo...");
+        setLoading(false);
+        navigate('/editor'); 
+      }, 1500);
+
+    } catch (err) {
+      console.error('Error de inicio de sesión:', err.message);
+      setError(err.message === 'Invalid login credentials' ? 'Correo o contraseña incorrectos' : err.message);
+      setLoading(false);
+    }
   };
 
   const handleRegisterClick = (e) => {
@@ -182,8 +216,14 @@ export function Login() {
               Acceso al portal
             </h2>
             <p className="text-xs sm:text-sm text-brand-carbon/60 font-medium mb-8 sm:mb-10">
-              Credenciales corporativas de alta seguridad
+              Tu portal exclusivo para la gestión de proyectos de impresión.
             </p>
+
+            {error && (
+              <div className="mb-4 p-3 bg-brand-red/10 border border-brand-red text-brand-red text-sm rounded">
+                {error}
+              </div>
+            )}
 
             <form className="space-y-6" onSubmit={handleSubmit}>
               {/* Form Group para Email con subrayado animado al hacer focus */}
@@ -257,13 +297,16 @@ export function Login() {
                 </label>
               </div>
 
-              {/* Botón Principal con Efecto Shimmer (Brillo recorriendo el fondo) */}
+              {/* Botón Principal con Efecto Shimmer */}
               <button
                 type="submit"
-                className="group relative flex w-full justify-center rounded-sm bg-brand-red px-3 py-4 text-sm font-bold text-brand-white shadow-xl shadow-brand-red/20 overflow-hidden transition-all hover:scale-[1.02] active:scale-[0.98] outline-none"
+                disabled={loading}
+                className={`group relative flex w-full justify-center rounded-sm bg-brand-red px-3 py-4 text-sm font-bold text-brand-white shadow-xl shadow-brand-red/20 overflow-hidden outline-none transition-all ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:scale-[1.02] active:scale-[0.98]'}`}
               >
-                <span className="relative z-10 tracking-widest">ACCEDER A LA PLATAFORMA</span>
-                <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] -translate-x-full group-hover:animate-shimmer"></div>
+                <span className="relative z-10 tracking-widest">
+                  {loading ? 'ACCEDIENDO...' : 'ACCEDER A LA PLATAFORMA'}
+                </span>
+                {!loading && <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] -translate-x-full group-hover:animate-shimmer"></div>}
               </button>
             </form>
 

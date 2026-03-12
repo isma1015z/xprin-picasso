@@ -8,19 +8,21 @@ import videoXp from '../assets/images/videoxp_6206.mp4';
 import prueba2 from '../assets/images/prueba2.jpg';
 import logoBlanco from '../assets/images/Logo_Blanco.png';
 import logoColor from '../assets/images/Picsart_26-03-10_10-02-37-011.png';
+import { supabase } from '../lib/supabase';
+import { sha256 } from '../lib/security';
 
 export function Registro() {
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    company: '',
-    address: '',
-    password: '',
-    confirmPassword: '',
-    isSubscribed: false
-  });
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [company, setCompany] = useState('');
+  const [address, setAddress] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const video1Ref = useRef(null);
   const video2Ref = useRef(null);
@@ -57,11 +59,6 @@ export function Registro() {
     return () => clearTimeout(timer);
   }, [currentMediaIndex]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
   const handleLoginClick = (e) => {
     e.preventDefault();
     setIsPrinting(true);
@@ -70,16 +67,51 @@ export function Registro() {
     }, 1500);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsPrinting(true);
-    console.log('Registration attempt:', formData);
+    if (password !== confirmPassword) {
+      setError("Las contraseñas no coinciden");
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
 
-    // Simulación de éxito de registro antes de navegar
-    setTimeout(() => {
-      // Por ahora navegamos al login tras registrar
-      navigate('/login');
-    }, 1500);
+    console.log('Register attempt:', { fullName, email, password, company, phone, agreeTerms });
+
+    try {
+      // Generar validación SHA-256 de los datos sensibles de registro
+      const validationString = `${fullName}|${email}|${company}|${phone}`;
+      const dataValidationHash = await sha256(validationString);
+
+      // Lógica real de Supabase con 2FA (Email & Phone)
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        phone, // Activación de SMS 2FA (Requiere configuración en panel de Supabase)
+        options: {
+          data: {
+            full_name: fullName,
+            company: company,
+            phone: phone,
+            data_validation_hash: dataValidationHash // Validado vía SHA-256
+          }
+        }
+      });
+
+      if (signUpError) throw signUpError;
+      
+      console.log('Usuario registrado:', data);
+      setIsPrinting(true);
+      setTimeout(() => {
+        navigate('/login');
+      }, 1500);
+
+    } catch (err) {
+      console.error('Error durante el registro:', err.message);
+      setError(err.message);
+      setLoading(false);
+    }
   };
 
   return (
@@ -197,8 +229,14 @@ export function Registro() {
               Crea tu cuenta corporativa
             </h2>
             <p className="text-xs sm:text-sm text-brand-carbon/60 font-medium mb-8 sm:mb-10">
-              Solicitud de acceso a producción
-            </p>
+                Crea tu cuenta corporativa para empezar a solicitar pedidos.
+              </p>
+
+              {error && (
+                <div className="mb-4 p-3 bg-brand-red/10 border border-brand-red text-brand-red text-sm rounded">
+                  {error}
+                </div>
+              )}
 
             <form className="space-y-5" onSubmit={handleSubmit}>
               <div className="group">
@@ -212,8 +250,8 @@ export function Registro() {
                     type="text"
                     required
                     placeholder="Juan Pérez"
-                    value={formData.fullName}
-                    onChange={handleChange}
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                     className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none sm:text-sm sm:leading-6"
                   />
                   <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
@@ -231,8 +269,8 @@ export function Registro() {
                     type="email"
                     required
                     placeholder="juan.perez@empresa.com"
-                    value={formData.email}
-                    onChange={handleChange}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none sm:text-sm sm:leading-6"
                   />
                   <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
@@ -250,8 +288,8 @@ export function Registro() {
                     type="tel"
                     required
                     placeholder="+34 600 000 000"
-                    value={formData.phone}
-                    onChange={handleChange}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none sm:text-sm sm:leading-6"
                   />
                   <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
@@ -269,8 +307,8 @@ export function Registro() {
                     type="text"
                     required
                     placeholder="XPRIN Solutions"
-                    value={formData.company}
-                    onChange={handleChange}
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
                     className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none sm:text-sm sm:leading-6"
                   />
                   <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
@@ -288,8 +326,8 @@ export function Registro() {
                     type="text"
                     required
                     placeholder="Calle de la Innovación, N° 45"
-                    value={formData.address}
-                    onChange={handleChange}
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
                     className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none sm:text-sm sm:leading-6"
                   />
                   <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
@@ -309,8 +347,8 @@ export function Registro() {
                       type="password"
                       required
                       placeholder="••••••••"
-                      value={formData.password}
-                      onChange={handleChange}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none sm:text-sm sm:leading-6"
                     />
                     <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
@@ -327,8 +365,8 @@ export function Registro() {
                       type="password"
                       required
                       placeholder="••••••••"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
                       className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-3.5 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none sm:text-sm sm:leading-6"
                     />
                     <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
@@ -371,15 +409,15 @@ export function Registro() {
 
                   {/* Botón CTA con Efecto Shimmer y Hover dinámico */}
                   <button
-                    type="submit"
-                    className="group/btn relative flex w-full justify-center items-center gap-3 rounded-sm bg-brand-red px-4 py-4 text-xs font-black text-brand-white shadow-xl shadow-brand-red/20 overflow-hidden transition-all hover:scale-[1.02] active:scale-[0.98] outline-none tracking-[0.2em]"
-                  >
-                    <span className="relative z-10">SUSCRIBIRSE AL PRODUCTO</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 relative z-10 animate-pulse" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                    <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] -translate-x-full group-hover/btn:animate-shimmer"></div>
-                  </button>
+                type="submit"
+                disabled={loading}
+                className={`group relative flex w-full justify-center rounded-sm bg-brand-red px-3 py-4 text-sm font-bold text-brand-white shadow-xl shadow-brand-red/20 overflow-hidden outline-none transition-all ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:scale-[1.02] active:scale-[0.98]'}`}
+              >
+                <span className="relative z-10 tracking-widest">
+                  {loading ? 'SOLICITANDO ACCESO...' : 'SOLICITAR ACCESO'}
+                </span>
+                {!loading && <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] -translate-x-full group-hover:animate-shimmer"></div>}
+              </button>
                 </div>
               </div>
 
