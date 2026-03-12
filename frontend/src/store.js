@@ -31,23 +31,28 @@ export const useStore = create((set, get) => ({
   // ── Acciones de Persistencia ──────────────────────────────────────────────
 
   hydrate: async () => {
-    const savedState = await loadState();
-    const savedFile = await getSavedFile();
-    
-    if (savedState) {
-      // Re-crear el ObjectURL para la imagen si el blob existe
-      let imagenUrl = savedState.imagenUrl;
-      if (savedFile) {
-        imagenUrl = URL.createObjectURL(savedFile);
-      }
+    try {
+      const savedState = await loadState();
+      const savedFile = await getSavedFile();
 
-      set({
-        ...savedState,
-        imagenUrl,
-        lastFile: savedFile,
-        hydrated: true,
-      });
-    } else {
+      if (savedState) {
+        // Re-crear el ObjectURL para la imagen si el blob existe
+        let imagenUrl = savedState.imagenUrl;
+        if (savedFile) {
+          imagenUrl = URL.createObjectURL(savedFile);
+        }
+
+        set({
+          ...savedState,
+          imagenUrl,
+          lastFile: savedFile,
+          hydrated: true,
+        });
+      } else {
+        set({ hydrated: true });
+      }
+    } catch (error) {
+      console.error('Error hydrating editor state:', error);
       set({ hydrated: true });
     }
   },

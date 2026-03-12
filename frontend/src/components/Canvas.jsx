@@ -128,12 +128,6 @@ export function Canvas() {
   const { ancho, alto } = imagenSize
   const capaActiva = capas.find((c) => c.id === capaActivaId) ?? null
 
-  useEffect(() => {
-    return () => {
-      if (saveModalTimerRef.current) clearTimeout(saveModalTimerRef.current)
-    }
-  }, [])
-
   // IDs de texturas reales usadas en alguna capa visible con spot=texture
   const usedTexturas = [
     ...new Set(
