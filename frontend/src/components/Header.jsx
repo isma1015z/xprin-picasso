@@ -2,6 +2,7 @@
 // Subir imagen · Ajustes de detección · Exportar PDF · Tema
 
 import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Upload, Sun, Moon, FileDown, ChevronDown, LogOut, Menu, X } from 'lucide-react'
 import { useStore } from '../store'
 import { DetectionSettings } from './DetectionSettings'
@@ -10,7 +11,8 @@ import lapizBlanco from '../assets/images/lapizBlanco.png'
 import logo from '../assets/images/Logo_Negro.png'
 import logoBlanco from '../assets/images/Logo_Blanco.png'
 
-export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = false, toggleMobileMenu = () => {} }) {
+export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = false, toggleMobileMenu = () => { } }) {
+  const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [exportMenu, setExportMenu] = useState(false)
   const {
@@ -107,9 +109,18 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
   return (
     <header className="relative flex items-center justify-between h-[60px] px-6 bg-surface border-b border-border-strong shadow-sm z-10 w-full shrink-0 max-md:px-3">
       <div className="flex items-center gap-4 min-w-0 flex-1">
-        <div className="h-6 w-28 flex items-center">
-          <img src={logoSrc} alt="XPRIN-Picasso" className="h-full w-full object-contain select-none" draggable={false} />
-        </div>
+        <button
+          onClick={() => navigate('/proyectos')}
+          className="h-6 w-28 flex items-center cursor-pointer"
+          title="Ir a mis proyectos"
+        >
+          <img
+            src={logoSrc}
+            alt="XPRIN-Picasso"
+            className="h-full w-full object-contain select-none"
+            draggable={false}
+          />
+        </button>
 
         {imagenUrl && (
           <>

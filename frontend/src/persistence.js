@@ -11,6 +11,7 @@ export async function saveState(state) {
     // No guardamos cosas temporales como cargando, errorMsg, etc.
     const stateToSave = {
       proyectoId: state.proyectoId,
+      savedProfileId: state.savedProfileId ?? null,
       proyectoNombre: state.proyectoNombre,
       imagenUrl: state.imagenUrl, // Nota: Si es un URL de objeto, puede no persistir bien entre sesiones, pero el blob sí.
       imagenSize: state.imagenSize,
