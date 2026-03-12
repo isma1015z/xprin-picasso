@@ -1,1 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --color-brand-red: #E41C24;
+  --color-brand-white: #FFFFFF;
+  --color-brand-gray: #E5E5E5;
+  --color-brand-dark: #333333;
+  --color-brand-carbon: #4A4A4A;
+  --color-brand-cyan: #0085C8;
+
+  --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-150%) skewX(-25deg);
+    }
+
+    100% {
+      transform: translateX(250%) skewX(-25deg);
+    }
+  }
+
+  @keyframes fade-in-up {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  --animate-shimmer: shimmer 2.5s infinite;
+  --animate-fade-in-up: fade-in-up 0.8s ease-out forwards;
+}
