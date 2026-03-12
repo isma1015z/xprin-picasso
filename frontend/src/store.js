@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { saveStateDebounced, clearPersistedState, loadState, getSavedFile, saveFile } from './persistence'
 
 const DEFAULT_SETTINGS = {
   remove_bg:   true,
@@ -67,7 +68,10 @@ export const useStore = create((set, get) => ({
 
   // ── Proyecto ──────────────────────────────────────────────────────────────
 
-  setProyecto: ({ proyectoId, nombre, imagenUrl, ancho, alto, capas }) => {
+  setProyecto: async ({ proyectoId, nombre, imagenUrl, ancho, alto, capas }) => {
+    // Al setear un nuevo proyecto, limpiamos todo rastro anterior de la DB
+    await clearPersistedState();
+    
     set({
       proyectoId,
       savedProfileId: null,
@@ -108,6 +112,29 @@ export const useStore = create((set, get) => ({
       errorMsg:       null,
       spotChannels:   (p.spotChannels ?? [...DEFAULT_SPOT_CHANNELS]).map(_migrarChannel),
     })
+  },
+
+  // Rehidratar desde IndexedDB
+  rehidratarStore: async () => {
+    const savedState = await loadState();
+    const savedFile = await getSavedFile();
+
+    if (savedState) {
+      // Si el URL era un blob viejo, ya no sirve. Re-creamos desde el file si existe
+      let restoredUrl = savedState.imagenUrl;
+      if (savedFile) {
+        restoredUrl = URL.createObjectURL(savedFile);
+      }
+
+      set({
+        ...savedState,
+        imagenUrl: restoredUrl,
+        lastFile: savedFile,
+        cargando: false,
+        errorMsg: null,
+      });
+      console.log('Estado restaurado desde IndexedDB');
+    }
   },
 
   // ── Canales spot ──────────────────────────────────────────────────────────
@@ -211,7 +238,10 @@ export const useStore = create((set, get) => ({
 
   setCapaActiva:     (id)  => set({ capaActivaId: id }),
   setSavedProfileId: (id)  => set({ savedProfileId: id }),
-  setLastFile:       (file) => set({ lastFile: file }),
+  setLastFile: (file) => {
+    set({ lastFile: file });
+    if (file) saveFile(file);
+  },
   setProyectoNombre: (nombre) => set({ proyectoNombre: nombre }),
 
   setSetting: (k, v) => set((s) => ({ settings: { ...s.settings, [k]: v } })),
@@ -222,7 +252,8 @@ export const useStore = create((set, get) => ({
   setError:         (msg) => set({ errorMsg: msg }),
   setSettingsOpen:  (v)   => set({ settingsOpen: v }),
 
-  resetEditor: () => {
+  resetEditor: async () => {
+    await clearPersistedState();
     set({
       proyectoId: null, savedProfileId: null, proyectoNombre: '', imagenUrl: null,
       imagenSize: { ancho: 0, alto: 0 }, capas: [], capaActivaId: null,
@@ -255,6 +286,13 @@ export const useStore = create((set, get) => ({
     return fd
   },
 }))
+
+// Suscribirse a cambios para autoguardado
+useStore.subscribe((state) => {
+  if (state.proyectoId) {
+    saveStateDebounced(state);
+  }
+});
 
 // ── Migraciones ───────────────────────────────────────────────────────────
 
