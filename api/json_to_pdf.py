@@ -272,11 +272,28 @@ def generar_pdf(datos, imagen_path, output_path, preview=False, embed_imagen=Tru
                 if not preview: cs += b"/GSOP gs\n"
 
                 if p_key:
-                    # Clippear la forma y rellenar con el patrón (solo se ve dentro del shape).
+                    # Base spot fill de la zona con opacidad del canal
+                    cs += f"{cs_name} cs\n".encode()
+                    if preview:
+                        r, g, b = _hex_to_rgb(ch.get("color", "#000000"))
+                        cs += f"{r:.4f} {g:.4f} {b:.4f} scn\n".encode()
+                    else:
+                        cs += f"{opacidad:.4f} scn\n".encode()
+                    cs += pb + b"f*\n"
+
+                    # Sobreponer el patrón dentro de la misma forma con alpha a 0.60 para ver lo de atrás
                     cs += pb + b"W n\n"
+                    cs += f"{cs_name} cs\n".encode()
+                    if preview:
+                        r, g, b = _hex_to_rgb(ch.get("color", "#000000"))
+                        cs += f"{r:.4f} {g:.4f} {b:.4f} scn\n".encode()
+                    else:
+                        cs += f"{opacidad:.4f} scn\n".encode()
                     cs += b"/Pattern cs\n"
                     cs += f"/{p_key} scn\n".encode()
+                    cs += b"0.60 ca\n"
                     cs += f"0 0 {ancho} {alto} re f\n".encode()
+                    cs += b"1.0 ca\n"
                 else:
                     cs += f"{cs_name} cs\n".encode()
                     if preview:
@@ -317,8 +334,8 @@ def generar_pdf(datos, imagen_path, output_path, preview=False, embed_imagen=Tru
             # Fallback: dibujar la forma completa del tile si no se detectó path válido.
             commands = f"0 0 m {sz:.3f} 0 l {sz:.3f} {sz:.3f} l 0 {sz:.3f} l h"
 
-        # El comando scn dentro del patrón usa el color del spot
-        p_stream = f"q\n/CS_{ch['id'].replace(' ', '_')} cs\n1.0 scn\n{commands}\nf*\nQ".encode()
+        # Patrón coloreado internamente con el spot channel (PaintType 1), + overprint + alpha.
+        p_stream = f"q\n/GSOP gs\n0.60 ca\n/CS_{ch['id'].replace(' ', '_')} cs\n1.0 scn\n{commands}\nf*\nQ".encode()
         
         # Matriz: El patrón debe alinearse con el documento. 
         # IMPORTANTE: Movemos el patrón para que no se corte por el flip de Y
