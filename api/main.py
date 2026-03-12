@@ -7,7 +7,7 @@ import os, uuid, json, traceback
 
 load_dotenv()
 
-app = FastAPI(title="XPRIN-Picasso API", version="0.8.3")
+app = FastAPI(title="XPRIN-Picasso API", version="0.9.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 @app.exception_handler(Exception)
@@ -30,11 +30,24 @@ def quitar_fondo(imagen_bytes: bytes) -> bytes:
         return imagen_bytes
 
 
+def capa_tiene_spots(capa: dict) -> bool:
+    """Comprueba si una capa tiene spots asignados — compatible con formato nuevo (spots[]) y viejo (spot)."""
+    # Formato nuevo: spots es una lista no vacía
+    spots_nuevo = capa.get("spots")
+    if isinstance(spots_nuevo, list) and len(spots_nuevo) > 0:
+        return True
+    # Formato viejo: spot es un string no nulo
+    spot_viejo = capa.get("spot")
+    if spot_viejo is not None and spot_viejo != "":
+        return True
+    return False
+
+
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.8.3"}
+    return {"status": "ok", "version": "0.9.0"}
 
-# Proceso
+
 @app.get("/uploads/{filename}")
 def get_uploaded_image(filename: str):
     safe_name = os.path.basename(filename)
@@ -109,7 +122,7 @@ async def export_pdf(
     imagen_path = None
     temp_imagen = None
 
-    # 1. Si viene una imagen en el request, usarla (prioridad alta para persistencia/cloud)
+    # 1. Si viene imagen en el request, usarla (prioridad alta)
     if imagen:
         print(f"  [EXPORT] Usando imagen subida en el request para {proyecto_id}")
         contenido = await imagen.read()
@@ -119,7 +132,7 @@ async def export_pdf(
                 f.write(contenido)
             imagen_path = temp_imagen
 
-    # 2. Si no viene imagen, buscarla en el disco (comportamiento legacy/local)
+    # 2. Si no viene, buscarla en disco
     if not imagen_path:
         sidecar = os.path.join(IMG_DIR, f"{proyecto_id}.json")
         if os.path.isfile(sidecar):
@@ -136,13 +149,15 @@ async def export_pdf(
         raise HTTPException(status_code=404,
             detail=f"Imagen no encontrada para {proyecto_id}. Súbela de nuevo.")
 
-    if not [c for c in proyecto_dict.get("capas", []) if c.get("spot")]:
+    # ── Validar que hay al menos una capa con spots (formato nuevo O viejo) ──
+    capas_con_spots = [c for c in proyecto_dict.get("capas", []) if capa_tiene_spots(c)]
+    if not capas_con_spots:
         raise HTTPException(status_code=400, detail="No hay capas con spot asignado.")
 
     sufijo   = "_preview.pdf" if preview else "_spots.pdf"
     pdf_path = os.path.join(EXPORT_DIR, f"{proyecto_id}{sufijo}")
 
-    # Guardar JSON completo del proyecto para debug/CLI
+    # Guardar JSON completo para debug/CLI
     json_debug = os.path.join(EXPORT_DIR, f"{proyecto_id}_proyecto.json")
     with open(json_debug, "w", encoding="utf-8") as f:
         json.dump(proyecto_dict, f, ensure_ascii=False, indent=2)
@@ -158,7 +173,6 @@ async def export_pdf(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error generando PDF: {e}")
     finally:
-        # Si creamos un archivo temporal para la imagen, borrarlo después de generar el PDF
         if temp_imagen and os.path.isfile(temp_imagen):
             try: os.remove(temp_imagen)
             except: pass

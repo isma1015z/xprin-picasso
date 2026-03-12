@@ -15,27 +15,17 @@ export function Editor() {
   )
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showSidebar, setShowSidebar] = useState(true)
-  const { imagenUrl, hydrate, hydrated } = useStore()
+  const { imagenUrl } = useStore()
   const isMobile = windowWidth < 768
   const sidebarWidth = isMobile ? Math.min(Math.round(windowWidth * 0.82), 280) : 240
 
   useEffect(() => {
-    hydrate()
-  }, [])
-
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
+    document.documentElement.classList.toggle('dark', theme === 'dark')
     localStorage.setItem('xprin-theme', theme)
   }, [theme])
 
   useEffect(() => {
-    function handleResize() {
-      setWindowWidth(window.innerWidth)
-    }
+    const handleResize = () => setWindowWidth(window.innerWidth)
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
@@ -44,17 +34,6 @@ export function Editor() {
     if (isMobile) setShowSidebar(false)
     if (!isMobile) setMobileMenuOpen(false)
   }, [isMobile])
-
-  if (!hydrated) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-base text-primary">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-accent border-t-transparent"></div>
-          <p className="text-lg font-medium">Recuperando sesión...</p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-base text-primary font-inter">
@@ -87,8 +66,7 @@ export function Editor() {
               />
             )}
             <div
-              className={`absolute inset-y-0 left-0 z-30 transition-transform duration-300 ease-out ${showSidebar ? 'translate-x-0' : '-translate-x-full'
-                }`}
+              className={`absolute inset-y-0 left-0 z-30 transition-transform duration-300 ease-out ${showSidebar ? 'translate-x-0' : '-translate-x-full'}`}
               style={{ width: sidebarWidth }}
             >
               <Sidebar />

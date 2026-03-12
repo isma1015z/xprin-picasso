@@ -1,6 +1,6 @@
 // useDetectar.js — lógica de detección compartida entre Header y DetectionSettings
 import { useStore } from './store'
-//Proceso
+import { API_URL } from './config'
 import { getDetectedImageUrl } from './detectedImageUrl'
 
 export function useDetectar() {
@@ -26,7 +26,6 @@ export function useDetectar() {
         throw new Error(detail)
       }
       const data = await res.json()
-      //Proceso
       const detectedUrl = getDetectedImageUrl(data, localUrl)
       setProyecto({
         proyectoId: data.id,
