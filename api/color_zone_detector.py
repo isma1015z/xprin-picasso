@@ -34,8 +34,8 @@ from typing import Optional
 # ── Defaults ──────────────────────────────────────────────────────────────────
 DEFAULT_N_COLORES   = 0       # 0 = automático
 DEFAULT_MIN_AREA    = 400     # px² mínimo por zona
-DEFAULT_GAUSS_SIGMA = 1.5     # suavizado pre-cuantización
-DEFAULT_EPSILON_PCT = 0.0012  # tolerancia RDP (fracción del perímetro)
+DEFAULT_GAUSS_SIGMA = 1.1     # suavizado pre-cuantización (menos agresivo)
+DEFAULT_EPSILON_PCT = 0.00045 # tolerancia RDP (fracción del perímetro)
 DEFAULT_DELTA_E     = 12.0    # umbral fusión de capas similares
 MAX_K               = 14      # máximo de colores auto
 
@@ -121,41 +121,7 @@ def kernel_cierre_adaptativo(mascara: np.ndarray, edges: np.ndarray) -> int:
         return 1
     if dens > 0.06:
         return 2
-    return 3
-
-def contorno_elipse_si_circular(
-    contorno: np.ndarray,
-    circularidad: float,
-    area_c: float,
-) -> Optional[np.ndarray]:
-    """Devuelve puntos de elipse solo en formas realmente circulares."""
-    if circularidad < 0.78 or area_c < 40.0 or len(contorno) < 8:
-        return None
-    try:
-        (cx, cy), (w, h), ang = cv2.fitEllipse(contorno)
-    except Exception:
-        return None
-    if w <= 0 or h <= 0:
-        return None
-    ratio = min(w, h) / max(w, h)
-    if ratio < 0.55:
-        return None
-
-    steps = 36 if area_c < 800 else 48
-    t = np.linspace(0.0, 2.0 * math.pi, steps, endpoint=False)
-    a = w / 2.0
-    b = h / 2.0
-    rad = math.radians(ang)
-    cosr = math.cos(rad)
-    sinr = math.sin(rad)
-    pts = []
-    for tt in t:
-        x0 = a * math.cos(tt)
-        y0 = b * math.sin(tt)
-        x = cx + (x0 * cosr - y0 * sinr)
-        y = cy + (x0 * sinr + y0 * cosr)
-        pts.append([int(round(x)), int(round(y))])
-    return np.array(pts, dtype=np.int32)
+    return 2
 
 def contorno_a_puntos(contorno: np.ndarray, area_hint: float, epsilon_pct: float) -> Optional[np.ndarray]:
     """Convierte contorno OpenCV a puntos de polígono, con ajuste adaptativo."""
@@ -175,14 +141,14 @@ def contorno_a_puntos(contorno: np.ndarray, area_hint: float, epsilon_pct: float
     if circularidad > 0.78:
         factor *= 0.80
 
-    epsilon = max(0.2, epsilon_pct * factor * perimetro)
+    # Mantener más detalle en bordes finos/antialias.
+    epsilon = max(0.08, epsilon_pct * factor * perimetro)
     approx = cv2.approxPolyDP(contorno, epsilon, True)
     if len(approx) < 3:
         return None
 
-    puntos_np = contorno_elipse_si_circular(contorno, circularidad, area_c)
-    if puntos_np is None:
-        puntos_np = approx.reshape(-1, 2)
+    # Sin "snap" a elipse: priorizamos fidelidad geométrica del contorno real.
+    puntos_np = approx.reshape(-1, 2)
     if puntos_np.shape[0] < 3:
         return None
     return puntos_np
@@ -217,7 +183,8 @@ def detectar_capas(
     alto, ancho = img.shape[:2]
     bgr   = img[:, :, :3]
     alpha = img[:, :, 3]
-    mask  = alpha > 10              # píxeles válidos (no fondo)
+    # Umbral bajo para conservar borde suave tras remove_bg (antialias en alpha).
+    mask  = alpha > 3               # píxeles válidos (no fondo)
 
     # Fallback robusto: algunas imágenes llegan totalmente transparentes.
     # Si no hay píxeles válidos por alpha, usamos todos los píxeles.
@@ -326,7 +293,8 @@ def detectar_capas(
 
             for idx_ext in exteriores:
                 contorno_ext = contornos[idx_ext]
-                if cv2.contourArea(contorno_ext) < min_area_rescate:
+                contour_min_area = max(6.0, float(min_area_rescate) * 0.35)
+                if cv2.contourArea(contorno_ext) < contour_min_area:
                     continue
 
                 puntos_ext = contorno_a_puntos(
