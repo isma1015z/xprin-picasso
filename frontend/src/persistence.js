@@ -4,24 +4,19 @@ const STORE_NAME = 'xprin-picasso-state';
 
 /**
  * Guarda el estado en IndexedDB.
- * @param {Object} state - El estado a persistir.
  */
 export async function saveState(state) {
   try {
-    // No guardamos cosas temporales como cargando, errorMsg, etc.
     const stateToSave = {
       proyectoId: state.proyectoId,
       savedProfileId: state.savedProfileId ?? null,
       proyectoNombre: state.proyectoNombre,
-      imagenUrl: state.imagenUrl, // Nota: Si es un URL de objeto, puede no persistir bien entre sesiones, pero el blob sí.
+      imagenUrl: state.imagenUrl,
       imagenSize: state.imagenSize,
       capas: state.capas,
       settings: state.settings,
+      spotChannels: state.spotChannels,
     };
-
-    // Si tenemos la imagen original como Blob/File, es mejor guardarla directamente.
-    // Pero por ahora guardaremos el estado básico. 
-    // Si imagenUrl es un blob URL, necesitamos guardar el Blob original.
     
     await set(STORE_NAME, stateToSave);
   } catch (error) {
@@ -31,14 +26,14 @@ export async function saveState(state) {
 
 let saveTimeout = null;
 /**
- * Versión debounced de saveState para evitar escrituras excesivas.
+ * Versión debounced de saveState.
  */
 export function saveStateDebounced(state) {
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => {
     saveState(state);
     saveTimeout = null;
-  }, 500); // 500ms de calma antes de guardar
+  }, 1000); // 1s de calma
 }
 
 /**
@@ -59,7 +54,6 @@ export async function getSavedFile() {
   try {
     return await get('xprin-last-file');
   } catch (error) {
-    console.error('Error getting file from IndexedDB:', error);
     return null;
   }
 }
@@ -71,18 +65,18 @@ export async function loadState() {
   try {
     return await get(STORE_NAME);
   } catch (error) {
-    console.error('Error loading state from IndexedDB:', error);
     return null;
   }
 }
 
 /**
- * Limpia el estado persistido.
+ * Limpia el estado persistido (Borrado total).
  */
 export async function clearPersistedState() {
   try {
     await del(STORE_NAME);
     await del('xprin-last-file');
+    console.log('IndexedDB limpieado por completo.');
   } catch (error) {
     console.error('Error clearing IndexedDB:', error);
   }

@@ -130,6 +130,7 @@ export function Canvas() {
         alto: data.documento.alto,
         capas: data.capas,
       })
+      setLastFile(file)
     } catch (err) {
       setError(err.message)
     } finally {
