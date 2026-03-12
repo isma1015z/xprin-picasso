@@ -34,6 +34,15 @@ def quitar_fondo(imagen_bytes: bytes) -> bytes:
 def health():
     return {"status": "ok", "version": "0.8.3"}
 
+# Proceso
+@app.get("/uploads/{filename}")
+def get_uploaded_image(filename: str):
+    safe_name = os.path.basename(filename)
+    file_path = os.path.join(IMG_DIR, safe_name)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Imagen no encontrada")
+    return FileResponse(path=file_path, media_type="image/png")
+
 
 # ── POST /detect-color-zones ──────────────────────────────────────────────────
 @app.post("/detect-color-zones")
@@ -69,6 +78,7 @@ async def detect_color_zones(
         )
 
         resultado["id"] = proyecto_id
+        resultado["imagen_url"] = f"/uploads/{proyecto_id}.png"
 
         with open(os.path.join(IMG_DIR, f"{proyecto_id}.json"), "w") as f:
             json.dump({"imagen_path": imagen_save}, f)

@@ -8,6 +8,7 @@ import { Upload, ZoomIn, ZoomOut, Maximize, Save, Check, FolderOpen } from 'luci
 import { useStore } from '../store'
 import { TEXTURES } from '../textures'
 import { getCurrentProfileOwner, saveProjectProfile } from '../projectProfiles'
+import { getDetectedImageUrl } from '../detectedImageUrl'
 
 const ZOOM_MIN = 0.1
 const ZOOM_MAX = 10
@@ -162,10 +163,11 @@ export function Canvas() {
         throw new Error(err.detail ?? 'Error del servidor')
       }
       const data = await res.json()
+      const detectedUrl = getDetectedImageUrl(data, localUrl)
       setProyecto({
         proyectoId: data.id,
         nombre:     data.nombre,
-        imagenUrl:  localUrl,
+        imagenUrl:  detectedUrl,
         ancho:      data.documento.ancho,
         alto:       data.documento.alto,
         capas:      data.capas,

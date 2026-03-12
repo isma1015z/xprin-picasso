@@ -4,6 +4,7 @@
 import { useRef } from 'react'
 import { useStore } from '../store'
 import { DetectionSettings } from './DetectionSettings'
+import { getDetectedImageUrl } from '../detectedImageUrl'
 
 const API = '/api'
 
@@ -44,11 +45,12 @@ export function ToolBar() {
       }
 
       const data = await res.json()
+      const detectedUrl = getDetectedImageUrl(data, localUrl)
 
       setProyecto({
         proyectoId:  data.id,
         nombre:      data.nombre,
-        imagenUrl:   localUrl,
+        imagenUrl:   detectedUrl,
         ancho:       data.documento.ancho,
         alto:        data.documento.alto,
         capas:       data.capas,
