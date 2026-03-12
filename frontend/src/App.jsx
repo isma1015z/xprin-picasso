@@ -14,6 +14,18 @@ export default function App() {
     rehidratarStore();
   }, [rehidratarStore]);
 
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      const { proyectoId } = useStore.getState();
+      if (proyectoId) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

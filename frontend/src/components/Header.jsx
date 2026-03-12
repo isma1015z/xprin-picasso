@@ -3,11 +3,12 @@
 
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, Sun, Moon, FileDown, ChevronDown, LogOut, Menu, X } from 'lucide-react'
+import { Upload, Sun, Moon, FileDown, ChevronDown, LogOut, Menu, X, Save } from 'lucide-react'
 import { useStore } from '../store'
 import { DetectionSettings } from './DetectionSettings'
 import { getDetectedImageUrl } from '../detectedImageUrl'
 import { API_URL } from '../config'
+import { ConfirmExitModal } from './ConfirmExitModal'
 import lapiz from '../assets/images/lapiz.png'
 import lapizBlanco from '../assets/images/lapizBlanco.png'
 import logo from '../assets/images/Logo_Negro.png'
@@ -17,18 +18,61 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [exportMenu, setExportMenu] = useState(false)
+  const [showExitModal, setShowExitModal] = useState(false)
+  const [isSavingOnExit, setIsSavingOnExit] = useState(false)
+
   const {
     imagenUrl, capas, cargando, exportandoPDF, errorMsg,
     setProyecto, setCargando, setExportandoPDF, setError, resetEditor,
     getProyectoJSON, proyectoNombre, setProyectoNombre, buildDetectionForm, setLastFile,
+    lastFile, savedProfileId, setSavedProfileId
   } = useStore()
+
+  // ── Funciones de Salida ──────────────────────────────────────────────────
+  async function handleConfirmSave() {
+    setIsSavingOnExit(true)
+    try {
+      const { getCurrentProfileOwner, saveProjectProfile } = await import('../projectProfiles')
+      
+      const sourceBlob = lastFile ?? await fetch(imagenUrl).then(r => r.blob())
+      const reader = new FileReader();
+      const imagenDataUrl = await new Promise(r => {
+        reader.onload = () => r(reader.result);
+        reader.readAsDataURL(sourceBlob);
+      });
+
+      const ownerId = await getCurrentProfileOwner()
+      const savedRecord = await saveProjectProfile({
+        ownerId, 
+        projectId: savedProfileId,
+        name: proyectoNombre || 'Proyecto',
+        snapshot: { version: 1, imagenDataUrl, project: getProyectoJSON() },
+      })
+      
+      setSavedProfileId(savedRecord.id)
+      await resetEditor()
+      setShowExitModal(false)
+      navigate('/proyectos')
+    } catch (err) {
+      console.error(err)
+      setError("Error al guardar antes de salir")
+    } finally {
+      setIsSavingOnExit(false)
+    }
+  }
+
+  async function handleConfirmDiscard() {
+    await resetEditor()
+    setShowExitModal(false)
+    navigate('/proyectos')
+  }
 
   const logoSrc = theme === 'dark' ? logoBlanco : logo
 
   // spotCount: capas que tienen al menos un spot activo
   const spotCount = capas.filter((c) => (c.spots ?? []).length > 0).length
 
-  // ── Subir imagen ──────────────────────────────────────────────────────────
+  // ── Subir imagen ──────────────────────────────────────────────────
   async function handleImageUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -110,7 +154,10 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
     <header className="relative flex items-center justify-between h-[60px] px-6 bg-surface border-b border-border-strong shadow-sm z-10 w-full shrink-0 max-md:px-3">
       <div className="flex items-center gap-4 min-w-0 flex-1">
         <button
-          onClick={() => navigate('/proyectos')}
+          onClick={() => {
+            if (imagenUrl) setShowExitModal(true)
+            else navigate('/proyectos')
+          }}
           className="h-6 w-28 flex items-center cursor-pointer"
           title="Ir a mis proyectos"
         >
@@ -223,13 +270,20 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
         )}
 
         {imagenUrl && (
-          <button onClick={resetEditor} title="Reiniciar editor"
+          <button onClick={() => setShowExitModal(true)} title="Cerrar proyecto"
             className="flex items-center gap-2 px-4 py-2 bg-surface-elevated text-secondary border border-border-light rounded-md text-sm font-medium transition-all duration-200 hover:bg-surface-hover hover:text-primary hover:border-border-strong cursor-pointer max-md:hidden">
             <LogOut size={15} />
-            <span>Reiniciar</span>
+            <span>Cerrar</span>
           </button>
         )}
       </div>
+
+      <ConfirmExitModal
+        open={showExitModal}
+        onSave={handleConfirmSave}
+        onDiscard={handleConfirmDiscard}
+        onCancel={() => setShowExitModal(false)}
+      />
 
       {isMobile && (
         <div className={`absolute top-full left-0 right-0 z-40 bg-surface border-b border-border-strong shadow-lg px-3 py-2
@@ -257,7 +311,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
             )}
 
             {imagenUrl && (
-              <button onClick={resetEditor}
+              <button onClick={() => setShowExitModal(true)}
                 className="h-10 w-full flex items-center justify-center gap-1.5 px-3 rounded-md text-xs font-medium border border-border-light bg-surface-elevated text-secondary hover:bg-surface-hover hover:text-primary hover:border-border-strong transition-all duration-200 cursor-pointer">
                 <LogOut size={14} />
                 Reiniciar
