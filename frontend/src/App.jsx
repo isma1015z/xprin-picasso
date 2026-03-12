@@ -4,6 +4,7 @@ import { Login }    from './pages/Login'
 import { Registro } from './pages/Registro'
 import { Editor }   from './pages/Editor'
 import { RecuperarContrasena } from './pages/RecuperarContrasena'
+import { ActualizarContrasena } from './pages/ActualizarContrasena'
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
         <Route path="/login"    element={<Login />}    />
         <Route path="/registro" element={<Registro />} />
         <Route path="/recuperar" element={<RecuperarContrasena />} />
+        <Route path="/actualizar-contrasena" element={<ActualizarContrasena />} />
         <Route path="/editor"   element={<Editor />}   />
       </Routes>
     </BrowserRouter>
