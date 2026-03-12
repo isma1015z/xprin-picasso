@@ -1,1 +1,34 @@
+# Entornos
 .env
+.env.local
+.env.*
+
+# Especificos por carpeta
+api/.env
+api/img/exports/*
+api/img/uploads/*
+frontend/.env
+
+# Dependencias
+node_modules
+frontend/node_modules
+
+# Build
+frontend/dist
+frontend/dist-ssr
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.sw?
+*.pdf
+*.ps
