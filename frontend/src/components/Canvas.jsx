@@ -278,8 +278,8 @@ export function Canvas() {
                           d={d}
                           fill="none"
                           stroke={BORDER_PURPLE}
-                          strokeWidth={0.55}
-                          strokeOpacity={0.95}
+                          strokeWidth={1.25}
+                          strokeOpacity={0.98}
                           strokeLinejoin="round"
                           strokeLinecap="round"
                           vectorEffect="non-scaling-stroke"
@@ -312,9 +312,9 @@ export function Canvas() {
                     d={formaToSVGPath(zona.forma, alto)}
                     fill="none"
                     stroke={BORDER_PURPLE}
-                    strokeWidth={0.9}
-                    strokeDasharray="3 2"
-                    strokeOpacity={0.98}
+                    strokeWidth={2.1}
+                    strokeDasharray="5 2.5"
+                    strokeOpacity={1}
                     strokeLinejoin="round"
                     strokeLinecap="round"
                     vectorEffect="non-scaling-stroke"
