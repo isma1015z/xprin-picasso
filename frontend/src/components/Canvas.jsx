@@ -6,6 +6,7 @@ import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pa
 import { Upload, ZoomIn, ZoomOut, Maximize } from 'lucide-react'
 import { useStore } from '../store'
 import { TEXTURES } from '../textures'
+import { API_URL } from '../config'
 
 const ZOOM_MIN = 0.1
 const ZOOM_MAX = 10
@@ -86,7 +87,7 @@ export function Canvas() {
     setError(null)
     try {
       const localUrl = URL.createObjectURL(file)
-      const res = await fetch('/api/detect-color-zones', {
+      const res = await fetch(`${API_URL}/detect-color-zones`, {
         method: 'POST',
         body:   buildDetectionForm(file),
       })
