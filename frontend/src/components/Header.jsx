@@ -67,15 +67,20 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
     setExportandoPDF(true)
     setError(null)
     try {
-      const params = new URLSearchParams()
-      if (preview) params.set('preview', 'true')
-      if (!embedImagen) params.set('embed_imagen', 'false')
+      const { lastFile } = useStore.getState() // Obtener el archivo del store
+      const fd = new FormData()
+      fd.append('proyecto', JSON.stringify(getProyectoJSON()))
+      fd.append('preview', String(preview))
+      fd.append('embed_imagen', String(embedImagen))
+      if (lastFile) {
+        fd.append('imagen', lastFile)
+      }
 
-      const res = await fetch(`/api/export-pdf?${params}`, {
+      const res = await fetch(`/api/export-pdf`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(getProyectoJSON()),
+        body: fd,
       })
+
       if (!res.ok) {
         const raw = await res.text()
         let detail = raw || res.statusText
@@ -122,7 +127,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
                 value={proyectoNombre || ''}
                 onChange={(e) => setProyectoNombre(e.target.value)}
                 className="text-sm text-secondary bg-transparent border border-transparent hover:border-border-light focus:border-accent focus:outline-none rounded pl-1.5 pr-8 py-0.5 w-full transition-colors"
-                title="Renombrar archivo PDF"
+                title="Renombrar archivo PDF" placeholder='Nombra tu PDF'
               />
               <img
                 src={theme === 'dark' ? lapizBlanco : lapiz}
