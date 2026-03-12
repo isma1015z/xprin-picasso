@@ -7,7 +7,7 @@ import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pa
 import { Upload, ZoomIn, ZoomOut, Maximize, Save, Check, FolderOpen } from 'lucide-react'
 import { useStore } from '../store'
 import { TEXTURES } from '../textures'
-import { getCurrentProfileOwner, saveProjectProfile } from '../projectProfiles'
+import { API_URL } from '../config'
 
 const ZOOM_MIN = 0.1
 const ZOOM_MAX = 10
@@ -17,8 +17,8 @@ function formaToSVGPath(forma, alto) {
   return forma
     .map((cmd) => {
       const y = alto - cmd.y
-      if (cmd.tipo === 'moveto')    return `M ${cmd.x} ${y}`
-      if (cmd.tipo === 'lineto')    return `L ${cmd.x} ${y}`
+      if (cmd.tipo === 'moveto') return `M ${cmd.x} ${y}`
+      if (cmd.tipo === 'lineto') return `L ${cmd.x} ${y}`
       if (cmd.tipo === 'closepath') return 'Z'
       return ''
     })
@@ -153,9 +153,9 @@ export function Canvas() {
     setError(null)
     try {
       const localUrl = URL.createObjectURL(file)
-      const res = await fetch('/api/detect-color-zones', {
+      const res = await fetch(`${API_URL}/detect-color-zones`, {
         method: 'POST',
-        body:   buildDetectionForm(file),
+        body: buildDetectionForm(file),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }))
@@ -164,11 +164,11 @@ export function Canvas() {
       const data = await res.json()
       setProyecto({
         proyectoId: data.id,
-        nombre:     data.nombre,
-        imagenUrl:  localUrl,
-        ancho:      data.documento.ancho,
-        alto:       data.documento.alto,
-        capas:      data.capas,
+        nombre: data.nombre,
+        imagenUrl: localUrl,
+        ancho: data.documento.ancho,
+        alto: data.documento.alto,
+        capas: data.capas,
       })
     } catch (err) {
       setError(err.message)
@@ -249,7 +249,7 @@ export function Canvas() {
       linear-gradient(45deg, transparent 75%, var(--color-surface) 75%),
       linear-gradient(-45deg, transparent 75%, var(--color-surface) 75%)
     `,
-    backgroundSize:     '20px 20px',
+    backgroundSize: '20px 20px',
     backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
   }
 
@@ -312,8 +312,8 @@ export function Canvas() {
           <div
             className="relative"
             style={{
-              width:     ancho,
-              height:    alto,
+              width: ancho,
+              height: alto,
               boxShadow: '0 12px 40px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.2)',
             }}
           >
@@ -323,9 +323,9 @@ export function Canvas() {
               src={imagenUrl}
               alt="canvas"
               style={{
-                display:  'block',
-                width:    ancho,
-                height:   alto,
+                display: 'block',
+                width: ancho,
+                height: alto,
                 position: 'absolute',
                 top: 0, left: 0,
               }}
@@ -454,14 +454,12 @@ export function Canvas() {
       </TransformWrapper>
       <SavedModal open={showSavedModal} onClose={() => setShowSavedModal(false)} />
       <div
-        className={`fixed inset-0 z-[125] grid place-items-center p-4 transition-all duration-200 ${
-          openingProjects ? 'pointer-events-auto bg-black/35 backdrop-blur-[1px] opacity-100' : 'pointer-events-none bg-black/0 opacity-0'
-        }`}
+        className={`fixed inset-0 z-[125] grid place-items-center p-4 transition-all duration-200 ${openingProjects ? 'pointer-events-auto bg-black/35 backdrop-blur-[1px] opacity-100' : 'pointer-events-none bg-black/0 opacity-0'
+          }`}
       >
         <div
-          className={`w-[300px] max-w-[90vw] rounded-xl border border-border-strong bg-surface p-4 text-center shadow-2xl transition-all duration-200 ${
-            openingProjects ? 'translate-y-0 scale-100' : 'translate-y-2 scale-[0.98]'
-          }`}
+          className={`w-[300px] max-w-[90vw] rounded-xl border border-border-strong bg-surface p-4 text-center shadow-2xl transition-all duration-200 ${openingProjects ? 'translate-y-0 scale-100' : 'translate-y-2 scale-[0.98]'
+            }`}
         >
           <p className="text-sm font-semibold text-primary">Abriendo mis proyectos...</p>
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-elevated">

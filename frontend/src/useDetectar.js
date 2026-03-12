@@ -1,5 +1,6 @@
 // useDetectar.js — lógica de detección compartida entre Header y DetectionSettings
 import { useStore } from './store'
+import { API_URL } from './config'
 
 export function useDetectar() {
   const {
@@ -13,7 +14,7 @@ export function useDetectar() {
     setError(null)
     try {
       const localUrl = URL.createObjectURL(file)
-      const res = await fetch('/api/detect-color-zones', {
+      const res = await fetch(`${API_URL}/detect-color-zones`, {
         method: 'POST',
         body: buildDetectionForm(file),
       })
