@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { saveState, loadState, saveFile, getSavedFile, clearPersistedState, saveStateDebounced } from './persistence'
 
 const DEFAULT_SETTINGS = {
   remove_bg:   true,
@@ -24,10 +25,35 @@ export const useStore = create((set, get) => ({
   cargando:      false,
   errorMsg:      null,
   exportandoPDF: false,
+  hydrated:      false, // Control de si ya se cargó de IndexedDB
+
+  // ── Acciones de Persistencia ──────────────────────────────────────────────
+
+  hydrate: async () => {
+    const savedState = await loadState();
+    const savedFile = await getSavedFile();
+    
+    if (savedState) {
+      // Re-crear el ObjectURL para la imagen si el blob existe
+      let imagenUrl = savedState.imagenUrl;
+      if (savedFile) {
+        imagenUrl = URL.createObjectURL(savedFile);
+      }
+
+      set({
+        ...savedState,
+        imagenUrl,
+        lastFile: savedFile,
+        hydrated: true,
+      });
+    } else {
+      set({ hydrated: true });
+    }
+  },
 
   // ── Acciones básicas ──────────────────────────────────────────────────────
 
-  setProyecto: ({ proyectoId, nombre, imagenUrl, ancho, alto, capas }) =>
+  setProyecto: async ({ proyectoId, nombre, imagenUrl, ancho, alto, capas }) => {
     set({
       proyectoId,
       proyectoNombre: nombre,
@@ -36,53 +62,84 @@ export const useStore = create((set, get) => ({
       capas,
       capaActivaId: capas.length > 0 ? capas[0].id : null,
       errorMsg: null,
-    }),
+    });
+    // Proyecto nuevo: guardar inmediatamente
+    await saveState(get());
+  },
 
   setCapaActiva:    (id)   => set({ capaActivaId: id }),
-  setProyectoNombre: (nombre) => set({ proyectoNombre: nombre }),
-  setSetting:       (k, v) => set((s) => ({ settings: { ...s.settings, [k]: v } })),
-  resetSettings:    ()     => set({ settings: { ...DEFAULT_SETTINGS } }),
+
+  setProyectoNombre: (nombre) => {
+    set({ proyectoNombre: nombre });
+    saveStateDebounced(get());
+  },
+
+  setSetting: (k, v) => {
+    set((s) => ({ settings: { ...s.settings, [k]: v } }));
+    saveStateDebounced(get());
+  },
+
+  resetSettings: () => {
+    set({ settings: { ...DEFAULT_SETTINGS } });
+    saveStateDebounced(get());
+  },
+
   setCargando:      (v)    => set({ cargando: v }),
   setExportandoPDF: (v)    => set({ exportandoPDF: v }),
   setError:         (msg)  => set({ errorMsg: msg }),
   setSettingsOpen:  (v)    => set({ settingsOpen: v }),
-  setLastFile:      (file) => set({ lastFile: file }),
+  
+  setLastFile:      async (file) => {
+    set({ lastFile: file });
+    if (file) await saveFile(file);
+  },
 
-  asignarSpot: (capaId, spot) =>
+  asignarSpot: (capaId, spot) => {
     set((s) => ({
       capas: s.capas.map((c) =>
         c.id === capaId ? { ...c, spot } : c
       ),
-    })),
+    }));
+    saveStateDebounced(get());
+  },
 
-  asignarTextura: (capaId, texturaId, texturaDisp) =>
+  asignarTextura: (capaId, texturaId, texturaDisp) => {
     set((s) => ({
       capas: s.capas.map((c) =>
         c.id === capaId
           ? { ...c, spot: 'texture', texturaId, texturaDisp, reliefLayers: c.reliefLayers || 10 }
           : c
       ),
-    })),
+    }));
+    saveStateDebounced(get());
+  },
 
-  asignarReliefLayer: (capaId, reliefLayers) =>
+  asignarReliefLayer: (capaId, reliefLayers) => {
     set((s) => ({
       capas: s.capas.map((c) =>
         c.id === capaId ? { ...c, reliefLayers } : c
       ),
-    })),
+    }));
+    saveStateDebounced(get());
+  },
 
-  toggleVisible: (capaId) =>
+  toggleVisible: (capaId) => {
     set((s) => ({
       capas: s.capas.map((c) =>
         c.id === capaId ? { ...c, visible: !c.visible } : c
       ),
-    })),
+    }));
+    saveStateDebounced(get());
+  },
 
-  resetEditor: () => set({
-    proyectoId: null, proyectoNombre: '', imagenUrl: null,
-    imagenSize: { ancho: 0, alto: 0 }, capas: [], capaActivaId: null,
-    cargando: false, errorMsg: null, exportandoPDF: false, lastFile: null,
-  }),
+  resetEditor: async () => {
+    set({
+      proyectoId: null, proyectoNombre: '', imagenUrl: null,
+      imagenSize: { ancho: 0, alto: 0 }, capas: [], capaActivaId: null,
+      cargando: false, errorMsg: null, exportandoPDF: false, lastFile: null,
+    });
+    await clearPersistedState();
+  },
 
   getProyectoJSON: () => {
     const s = get()
@@ -107,3 +164,4 @@ export const useStore = create((set, get) => ({
     return fd
   },
 }))
+
