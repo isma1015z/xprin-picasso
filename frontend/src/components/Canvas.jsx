@@ -1,11 +1,12 @@
 // Canvas — react-zoom-pan-pinch + overlays SVG con texturas
 // Responsable: Juan
 
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch'
-import { Upload, ZoomIn, ZoomOut, Maximize } from 'lucide-react'
+import { Upload, ZoomIn, ZoomOut, Maximize, Save } from 'lucide-react'
 import { useStore } from '../store'
 import { TEXTURES } from '../textures'
+import { saveProject } from '../savedProjects'
 
 const ZOOM_MIN = 0.1
 const ZOOM_MAX = 10
@@ -24,7 +25,7 @@ function formaToSVGPath(forma, alto) {
 }
 
 // Controles de zoom — dentro del contexto TransformWrapper
-function ZoomControls() {
+function ZoomControls({ onSave, savingProject }) {
   const { zoomIn, zoomOut, resetTransform, centerView } = useControls()
 
   function handleResetView() {
@@ -34,41 +35,78 @@ function ZoomControls() {
   }
 
   return (
-    <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-surface rounded-full px-2 py-1.5 shadow-md border border-border-light z-20">
+    <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
       <button
-        onClick={() => zoomOut()}
-        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors"
-        title="Alejar"
+        onClick={onSave}
+        disabled={savingProject}
+        className="h-10 px-3.5 rounded-full border border-border-light bg-surface text-secondary
+          hover:bg-surface-hover hover:text-primary transition-colors shadow-md
+          disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2 text-xs font-medium"
+        title="Guardar proyecto"
       >
-        <ZoomOut size={14} />
+        {savingProject ? (
+          <>
+            <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+            </svg>
+            Guardando...
+          </>
+        ) : (
+          <>
+            <Save size={14} />
+            Guardar
+          </>
+        )}
       </button>
-      <button
-        onClick={handleResetView}
-        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors"
-        title="Restablecer vista"
-      >
-        <Maximize size={13} />
-      </button>
-      <button
-        onClick={() => zoomIn()}
-        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors"
-        title="Acercar"
-      >
-        <ZoomIn size={14} />
-      </button>
+
+      <div className="flex items-center gap-1 bg-surface rounded-full px-2 py-1.5 shadow-md border border-border-light">
+        <button
+          onClick={() => zoomOut()}
+          className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors"
+          title="Alejar"
+        >
+          <ZoomOut size={14} />
+        </button>
+        <button
+          onClick={handleResetView}
+          className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors"
+          title="Restablecer vista"
+        >
+          <Maximize size={13} />
+        </button>
+        <button
+          onClick={() => zoomIn()}
+          className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors"
+          title="Acercar"
+        >
+          <ZoomIn size={14} />
+        </button>
+      </div>
     </div>
   )
 }
 
 export function Canvas() {
   const fileInputRef = useRef(null)
+  const saveModalTimerRef = useRef(null)
+  const [savingProject, setSavingProject] = useState(false)
+  const [saveModalOpen, setSaveModalOpen] = useState(false)
+  const [saveModalVisible, setSaveModalVisible] = useState(false)
   const {
     imagenUrl, imagenSize, capas, capaActivaId,
     cargando, setProyecto, setCargando, setError, setCapaActiva, buildDetectionForm,
+    getProyectoJSON, proyectoNombre, settings,
   } = useStore()
 
   const { ancho, alto } = imagenSize
   const capaActiva = capas.find((c) => c.id === capaActivaId) ?? null
+
+  useEffect(() => {
+    return () => {
+      if (saveModalTimerRef.current) clearTimeout(saveModalTimerRef.current)
+    }
+  }, [])
 
   // IDs de texturas reales usadas en alguna capa visible con spot=texture
   const usedTexturas = [
@@ -108,6 +146,69 @@ export function Canvas() {
     } finally {
       setCargando(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function imageUrlToDataUrl(url) {
+    if (!url) return null
+    if (url.startsWith('data:')) return url
+    const res = await fetch(url)
+    const blob = await res.blob()
+    return await new Promise((resolve, reject) => {
+      const fr = new FileReader()
+      fr.onload = () => resolve(fr.result)
+      fr.onerror = reject
+      fr.readAsDataURL(blob)
+    })
+  }
+
+  function closeSaveModal() {
+    setSaveModalVisible(false)
+    setTimeout(() => setSaveModalOpen(false), 180)
+  }
+
+  async function handleSaveProject() {
+    if (savingProject) return
+    if (!imagenUrl || !capas.length) {
+      setError('No hay proyecto para guardar todavía.')
+      return
+    }
+    const t0 = Date.now()
+    setSavingProject(true)
+    try {
+      const thumb = await imageUrlToDataUrl(imagenUrl)
+      const baseName = (proyectoNombre || 'Proyecto sin nombre').trim()
+      const now = Date.now()
+      saveProject({
+        id: `${(getProyectoJSON().id || 'local')}_${now}`,
+        nombre: baseName,
+        updatedAt: now,
+        thumbnail: thumb,
+        payload: {
+          proyectoId: getProyectoJSON().id || null,
+          nombre: baseName,
+          imagenDataUrl: thumb,
+          ancho: getProyectoJSON().documento.ancho,
+          alto: getProyectoJSON().documento.alto,
+          capas: getProyectoJSON().capas,
+          settings,
+        },
+      })
+      const elapsed = Date.now() - t0
+      if (elapsed < 1000) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 - elapsed))
+      }
+      setError(null)
+      setSaveModalOpen(true)
+      requestAnimationFrame(() => setSaveModalVisible(true))
+      if (saveModalTimerRef.current) clearTimeout(saveModalTimerRef.current)
+      saveModalTimerRef.current = setTimeout(() => {
+        closeSaveModal()
+      }, 1800)
+    } catch (err) {
+      setError(err?.message || 'No se pudo guardar el proyecto.')
+    } finally {
+      setSavingProject(false)
     }
   }
 
@@ -314,8 +415,33 @@ export function Canvas() {
           </div>
         </TransformComponent>
 
-        <ZoomControls />
+        <ZoomControls onSave={handleSaveProject} savingProject={savingProject} />
       </TransformWrapper>
+
+      {saveModalOpen && (
+        <div
+          className={`fixed inset-0 z-[120] flex items-center justify-center p-4 transition-all duration-200
+            ${saveModalVisible ? 'bg-black/45 opacity-100' : 'bg-black/0 opacity-0'}`}
+          onClick={closeSaveModal}
+        >
+          <div
+            className={`w-full max-w-sm rounded-xl border border-border-strong bg-surface shadow-2xl p-5 transition-all duration-200
+              ${saveModalVisible ? 'translate-y-0 scale-100' : 'translate-y-2 scale-[0.98]'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-base font-semibold text-primary">Proyecto guardado</p>
+            <p className="text-sm text-muted mt-1">Se guardó correctamente en “Mis imágenes”.</p>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={closeSaveModal}
+                className="px-3 py-1.5 rounded-md border border-border-light bg-surface-elevated text-sm hover:bg-surface-hover transition-colors"
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
