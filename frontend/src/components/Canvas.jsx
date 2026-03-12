@@ -8,6 +8,7 @@ import { Upload, ZoomIn, ZoomOut, Maximize, Save, Check, FolderOpen } from 'luci
 import { useStore } from '../store'
 import { TEXTURES } from '../textures'
 import { API_URL } from '../config'
+import { getCurrentProfileOwner, saveProjectProfile } from '../projectProfiles'
 
 const ZOOM_MIN = 0.1
 const ZOOM_MAX = 10
