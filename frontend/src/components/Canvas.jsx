@@ -13,6 +13,7 @@ import { getDetectedImageUrl } from '../detectedImageUrl'
 
 const ZOOM_MIN = 0.1
 const ZOOM_MAX = 10
+const BORDER_PURPLE = '#ffffff'
 
 function formaToSVGPath(forma, alto) {
   return forma
@@ -130,6 +131,7 @@ export function Canvas() {
         alto: data.documento.alto,
         capas: data.capas,
       })
+      setLastFile(file)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -270,8 +272,18 @@ export function Canvas() {
                   return capa.zonas.map((zona) => {
                     const d = formaToSVGPath(zona.forma, alto)
                     return (
-                      <g key={zona.id}>
-                        <path d={d} fill={overlayColor} fillOpacity={0.20} stroke={overlayColor} strokeWidth={1.5} strokeOpacity={0.60}/>
+                      <g key={`${capa.id}-${zona.id}`}>
+                        <path d={d} fill={overlayColor} fillOpacity={0.20}/>
+                        <path
+                          d={d}
+                          fill="none"
+                          stroke={BORDER_PURPLE}
+                          strokeWidth={0.55}
+                          strokeOpacity={0.95}
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                          vectorEffect="non-scaling-stroke"
+                        />
                         {/* Un overlay de textura por cada spot con textura */}
                         {(capa.spots ?? []).map((sp) => {
                           if (!sp.texturaSvg) return null
@@ -290,10 +302,24 @@ export function Canvas() {
 
               {/* Resaltado de capa activa */}
               {capaActiva && capaActiva.zonas.map((zona) => (
-                <path key={`active-${zona.id}`}
-                  d={formaToSVGPath(zona.forma, alto)}
-                  fill={capaActiva.color} fillOpacity={0.32}
-                  stroke="white" strokeWidth={2} strokeDasharray="5 2.5"/>
+                <g key={`active-${zona.id}`}>
+                  <path
+                    d={formaToSVGPath(zona.forma, alto)}
+                    fill={capaActiva.color}
+                    fillOpacity={0.32}
+                  />
+                  <path
+                    d={formaToSVGPath(zona.forma, alto)}
+                    fill="none"
+                    stroke={BORDER_PURPLE}
+                    strokeWidth={0.9}
+                    strokeDasharray="3 2"
+                    strokeOpacity={0.98}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </g>
               ))}
             </svg>
 
