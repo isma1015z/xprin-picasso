@@ -1,5 +1,7 @@
 // useDetectar.js — lógica de detección compartida entre Header y DetectionSettings
 import { useStore } from './store'
+//Proceso
+import { getDetectedImageUrl } from './detectedImageUrl'
 
 export function useDetectar() {
   const {
@@ -13,7 +15,7 @@ export function useDetectar() {
     setError(null)
     try {
       const localUrl = URL.createObjectURL(file)
-      const res = await fetch('/api/detect-color-zones', {
+      const res = await fetch(`${API_URL}/detect-color-zones`, {
         method: 'POST',
         body: buildDetectionForm(file),
       })
@@ -24,10 +26,12 @@ export function useDetectar() {
         throw new Error(detail)
       }
       const data = await res.json()
+      //Proceso
+      const detectedUrl = getDetectedImageUrl(data, localUrl)
       setProyecto({
         proyectoId: data.id,
         nombre:     data.nombre,
-        imagenUrl:  localUrl,
+        imagenUrl:  detectedUrl,
         ancho:      data.documento.ancho,
         alto:       data.documento.alto,
         capas:      data.capas,

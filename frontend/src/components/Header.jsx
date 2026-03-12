@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { Upload, Sun, Moon, FileDown, ChevronDown, LogOut, Menu, X } from 'lucide-react'
 import { useStore } from '../store'
 import { DetectionSettings } from './DetectionSettings'
+import { getDetectedImageUrl } from '../detectedImageUrl'
 import lapiz from '../assets/images/lapiz.png'
 import lapizBlanco from '../assets/images/lapizBlanco.png'
 import logo from '../assets/images/Logo_Negro.png'
@@ -31,7 +32,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
     setError(null)
     try {
       const localUrl = URL.createObjectURL(file)
-      const res = await fetch('/api/detect-color-zones', {
+      const res = await fetch(`${API_URL}/detect-color-zones`, {
         method: 'POST',
         body: buildDetectionForm(file),
       })
@@ -42,10 +43,11 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
         throw new Error(detail)
       }
       const data = await res.json()
+      const detectedUrl = getDetectedImageUrl(data, localUrl)
       setProyecto({
         proyectoId: data.id,
         nombre: data.nombre,
-        imagenUrl: localUrl,
+        imagenUrl: detectedUrl,
         ancho: data.documento.ancho,
         alto: data.documento.alto,
         capas: data.capas,
@@ -78,7 +80,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
         fd.append('imagen', lastFile)
       }
 
-      const res = await fetch(`/api/export-pdf`, {
+      const res = await fetch(`${API_URL}/export-pdf`, {
         method: 'POST',
         body: fd,
       })
