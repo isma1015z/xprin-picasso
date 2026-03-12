@@ -1,11 +1,13 @@
 // Canvas — react-zoom-pan-pinch + overlays SVG con texturas
 // Responsable: Juan
 
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch'
-import { Upload, ZoomIn, ZoomOut, Maximize } from 'lucide-react'
+import { Upload, ZoomIn, ZoomOut, Maximize, Save, Check, FolderOpen } from 'lucide-react'
 import { useStore } from '../store'
 import { TEXTURES } from '../textures'
+import { getCurrentProfileOwner, saveProjectProfile } from '../projectProfiles'
 
 const ZOOM_MIN = 0.1
 const ZOOM_MAX = 10
@@ -24,7 +26,7 @@ function formaToSVGPath(forma, alto) {
 }
 
 // Controles de zoom — dentro del contexto TransformWrapper
-function ZoomControls() {
+function ZoomControls({ onSave, onOpenProjects, isSaving, disabled }) {
   const { zoomIn, zoomOut, resetTransform, centerView } = useControls()
 
   function handleResetView() {
@@ -34,37 +36,93 @@ function ZoomControls() {
   }
 
   return (
-    <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-surface rounded-full px-2 py-1.5 shadow-md border border-border-light z-20">
+    <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2 max-md:left-1/2 max-md:right-auto max-md:w-[calc(100%-14px)] max-md:-translate-x-1/2 max-md:justify-between">
       <button
-        onClick={() => zoomOut()}
-        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors"
-        title="Alejar"
+        onClick={onOpenProjects}
+        className="h-10 rounded-full border border-border-light bg-surface-elevated px-4 text-secondary text-sm font-semibold inline-flex items-center gap-2 hover:bg-surface-hover hover:text-primary transition-colors shadow-md cursor-pointer max-md:h-9 max-md:px-3 max-md:text-[12px] max-md:gap-1.5"
+        title="Ir a mis proyectos"
       >
-        <ZoomOut size={14} />
+        <FolderOpen size={13} />
+        Mis proyectos
       </button>
       <button
-        onClick={handleResetView}
-        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors"
-        title="Restablecer vista"
+        onClick={onSave}
+        disabled={disabled || isSaving}
+        className="h-10 rounded-full border border-border-light bg-accent px-4 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-accent-hover transition-colors disabled:opacity-60 disabled:pointer-events-none shadow-md cursor-pointer max-md:h-9 max-md:px-3 max-md:text-[12px] max-md:gap-1.5"
+        title="Guardar proyecto"
       >
-        <Maximize size={13} />
+        {isSaving ? (
+          <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+        ) : (
+          <Save size={13} />
+        )}
+        Guardar
       </button>
-      <button
-        onClick={() => zoomIn()}
-        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors"
-        title="Acercar"
+      <div className="flex items-center gap-1 bg-surface rounded-full px-2 py-1.5 shadow-md border border-border-light max-md:px-1.5 max-md:py-1">
+        <button
+          onClick={() => zoomOut()}
+          className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors max-md:w-6 max-md:h-6"
+          title="Alejar"
+        >
+          <ZoomOut size={13} />
+        </button>
+        <button
+          onClick={handleResetView}
+          className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors max-md:w-6 max-md:h-6"
+          title="Restablecer vista"
+        >
+          <Maximize size={12} />
+        </button>
+        <button
+          onClick={() => zoomIn()}
+          className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-hover text-secondary hover:text-primary transition-colors max-md:w-6 max-md:h-6"
+          title="Acercar"
+        >
+          <ZoomIn size={13} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function SavedModal({ open, onClose }) {
+  useEffect(() => {
+    if (!open) return
+    const t = setTimeout(onClose, 1600)
+    return () => clearTimeout(t)
+  }, [open, onClose])
+
+  return (
+    <div
+      className={`fixed inset-0 z-[120] grid place-items-center p-4 transition-all duration-200 ${open ? 'pointer-events-auto bg-black/35 opacity-100' : 'pointer-events-none bg-black/0 opacity-0'}`}
+    >
+      <div
+        className={`w-[320px] max-w-[92vw] rounded-xl border border-border-strong bg-surface p-5 text-center shadow-2xl transition-all duration-250 ${open ? 'translate-y-0 scale-100' : 'translate-y-3 scale-[0.96]'}`}
       >
-        <ZoomIn size={14} />
-      </button>
+        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-500">
+          <Check size={22} />
+        </div>
+        <p className="text-base font-semibold text-primary">Proyecto guardado</p>
+        <p className="mt-1 text-sm text-secondary">Lo veras en "Mis imagenes".</p>
+      </div>
     </div>
   )
 }
 
 export function Canvas() {
+  const navigate = useNavigate()
   const fileInputRef = useRef(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [showSavedModal, setShowSavedModal] = useState(false)
+  const [openingProjects, setOpeningProjects] = useState(false)
+  const [openingProjectsProgress, setOpeningProjectsProgress] = useState(0)
   const {
     imagenUrl, imagenSize, capas, capaActivaId,
-    cargando, setProyecto, setCargando, setError, setCapaActiva, buildDetectionForm,
+    cargando, proyectoNombre, savedProfileId, getProyectoJSON, lastFile,
+    setProyecto, setCargando, setError, setCapaActiva, setSavedProfileId, buildDetectionForm,
   } = useStore()
 
   const { ancho, alto } = imagenSize
@@ -78,6 +136,15 @@ export function Canvas() {
         .map((c) => c.texturaId)
     ),
   ]
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  }
 
   async function handleImageUpload(e) {
     const file = e.target.files?.[0]
@@ -108,6 +175,70 @@ export function Canvas() {
     } finally {
       setCargando(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function handleSaveProject() {
+    if (!imagenUrl || isSaving) return
+
+    setIsSaving(true)
+    setError(null)
+    const startedAt = Date.now()
+
+    try {
+      let sourceBlob = null
+      if (lastFile) {
+        sourceBlob = lastFile
+      } else {
+        sourceBlob = await fetch(imagenUrl).then((r) => r.blob())
+      }
+
+      const imagenDataUrl = await blobToDataUrl(sourceBlob)
+      const ownerId = await getCurrentProfileOwner()
+
+      const savedRecord = await saveProjectProfile({
+        ownerId,
+        projectId: savedProfileId,
+        name: proyectoNombre || 'Proyecto',
+        snapshot: {
+          version: 1,
+          imagenDataUrl,
+          project: getProyectoJSON(),
+        },
+      })
+      setSavedProfileId(savedRecord.id)
+
+      const elapsed = Date.now() - startedAt
+      if (elapsed < 1000) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 - elapsed))
+      }
+      setShowSavedModal(true)
+    } catch (err) {
+      setError(err.message || 'No se pudo guardar el proyecto')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  async function handleOpenProjects() {
+    if (openingProjects) return
+    let timer = null
+    try {
+      setOpeningProjects(true)
+      setOpeningProjectsProgress(10)
+      const duration = 900
+      const startedAt = Date.now()
+      timer = setInterval(() => {
+        const elapsed = Date.now() - startedAt
+        const p = Math.min(95, 10 + Math.round((elapsed / duration) * 85))
+        setOpeningProjectsProgress(p)
+      }, 60)
+      await new Promise((resolve) => setTimeout(resolve, duration))
+      setOpeningProjectsProgress(100)
+      await new Promise((resolve) => setTimeout(resolve, 120))
+      navigate('/proyectos')
+    } finally {
+      if (timer) clearInterval(timer)
     }
   }
 
@@ -314,8 +445,33 @@ export function Canvas() {
           </div>
         </TransformComponent>
 
-        <ZoomControls />
+        <ZoomControls
+          onSave={handleSaveProject}
+          onOpenProjects={handleOpenProjects}
+          isSaving={isSaving}
+          disabled={!imagenUrl}
+        />
       </TransformWrapper>
+      <SavedModal open={showSavedModal} onClose={() => setShowSavedModal(false)} />
+      <div
+        className={`fixed inset-0 z-[125] grid place-items-center p-4 transition-all duration-200 ${
+          openingProjects ? 'pointer-events-auto bg-black/35 backdrop-blur-[1px] opacity-100' : 'pointer-events-none bg-black/0 opacity-0'
+        }`}
+      >
+        <div
+          className={`w-[300px] max-w-[90vw] rounded-xl border border-border-strong bg-surface p-4 text-center shadow-2xl transition-all duration-200 ${
+            openingProjects ? 'translate-y-0 scale-100' : 'translate-y-2 scale-[0.98]'
+          }`}
+        >
+          <p className="text-sm font-semibold text-primary">Abriendo mis proyectos...</p>
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-elevated">
+            <div
+              className="h-full rounded-full bg-accent transition-[width] duration-100 ease-out"
+              style={{ width: `${openingProjectsProgress}%` }}
+            />
+          </div>
+        </div>
+      </div>
     </main>
   )
 }

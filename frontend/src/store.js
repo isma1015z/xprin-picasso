@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
 export const useStore = create((set, get) => ({
 
   proyectoId:     null,
+  savedProfileId: null,
   proyectoNombre: '',
   imagenUrl:      null,
   imagenSize:     { ancho: 0, alto: 0 },
@@ -56,6 +57,7 @@ export const useStore = create((set, get) => ({
   setProyecto: async ({ proyectoId, nombre, imagenUrl, ancho, alto, capas }) => {
     set({
       proyectoId,
+      savedProfileId: null,
       proyectoNombre: nombre,
       imagenUrl,
       imagenSize: { ancho, alto },
@@ -67,7 +69,44 @@ export const useStore = create((set, get) => ({
     await saveState(get());
   },
 
+  cargarProyectoGuardado: async (savedProject) => {
+    const snapshot = savedProject?.snapshot
+    if (!snapshot?.project) return
+
+    const p = snapshot.project
+    const imagenDataUrl = snapshot.imagenDataUrl ?? null
+    let restoredFile = null
+
+    if (imagenDataUrl) {
+      try {
+        const blob = await fetch(imagenDataUrl).then((r) => r.blob())
+        restoredFile = new File([blob], `${p.nombre || 'proyecto'}.png`, { type: blob.type || 'image/png' })
+      } catch {
+        restoredFile = null
+      }
+    }
+
+    set({
+      proyectoId: p.id ?? crypto.randomUUID(),
+      savedProfileId: savedProject?.id ?? null,
+      proyectoNombre: p.nombre ?? 'Proyecto',
+      imagenUrl: imagenDataUrl,
+      imagenSize: {
+        ancho: p.documento?.ancho ?? 0,
+        alto: p.documento?.alto ?? 0,
+      },
+      capas: p.capas ?? [],
+      capaActivaId: p.capas?.[0]?.id ?? null,
+      lastFile: restoredFile,
+      errorMsg: null,
+    })
+
+    if (restoredFile) await saveFile(restoredFile)
+    await saveState(get())
+  },
+
   setCapaActiva:    (id)   => set({ capaActivaId: id }),
+  setSavedProfileId: (id)  => set({ savedProfileId: id }),
 
   setProyectoNombre: (nombre) => {
     set({ proyectoNombre: nombre });
@@ -134,7 +173,7 @@ export const useStore = create((set, get) => ({
 
   resetEditor: async () => {
     set({
-      proyectoId: null, proyectoNombre: '', imagenUrl: null,
+      proyectoId: null, savedProfileId: null, proyectoNombre: '', imagenUrl: null,
       imagenSize: { ancho: 0, alto: 0 }, capas: [], capaActivaId: null,
       cargando: false, errorMsg: null, exportandoPDF: false, lastFile: null,
     });
