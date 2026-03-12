@@ -64,6 +64,7 @@ export function ProjectsMenu() {
     } catch {
       setOpeningProject(null)
       setOpeningProgress(0)
+      navigate('/editor')
     } finally {
       if (timer) clearInterval(timer)
     }
@@ -91,8 +92,10 @@ export function ProjectsMenu() {
       await new Promise((resolve) => setTimeout(resolve, 220))
       navigate('/editor')
     } catch {
+      await resetEditor()
       setOpeningProject(null)
       setOpeningProgress(0)
+      navigate('/editor')
     } finally {
       if (timer) clearInterval(timer)
     }
