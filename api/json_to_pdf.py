@@ -213,22 +213,50 @@ def generar_pdf(datos, imagen_path, output_path, preview=False, embed_imagen=Tru
         # Como el documento está al revés, a veces el patrón necesita un shift.
         matrix = f"[1 0 0 1 0 0]" 
         
+        pdf_name_val = ch.get("label", ch['id']).strip() or ch['id']
+        label_safe = pdf_name_val.replace(" ", "#20").replace("(", "#28").replace(")", "#29")
+        
         p_hdr = (
             f"<< /Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1 "
             f"/BBox [0 0 {sz} {sz}] /XStep {sz} /YStep {sz} "
-            f"/Resources << /ProcSet [/PDF] /ColorSpace << /CS_{ch['id'].replace(' ', '_')} [/Separation /{ch.get('label', ch['id'])} /DeviceCMYK {CHANNEL_OBJS[ch['id']]} 0 R] >> >> "
+            f"/Resources << /ProcSet [/PDF] /ColorSpace << /CS_{ch['id'].replace(' ', '_')} [/Separation /{label_safe} /DeviceCMYK {CHANNEL_OBJS[ch['id']]} 0 R] >> >> "
             f"/Matrix {matrix} /Length {len(p_stream)} >>\nstream\n"
         ).encode()
         obj_bodies[p_data["obj"]] = p_hdr + p_stream + b"\nendstream"
 
     # Resources
-    cs_entries = [f"/CS_{ch['id'].replace(' ', '_')} " + (f"[/DeviceRGB]" if preview else f"[/Separation /{ch.get('label', ch['id'])} /DeviceCMYK {CHANNEL_OBJS[ch['id']]} 0 R]") for ch in channels if ch["id"] in por_canal]
+    def _pdf_safe_name(s):
+        return s.replace(" ", "#20").replace("(", "#28").replace(")", "#29")
+
+    cs_entries = []
+    for ch in channels:
+        cid = ch["id"]
+        # FIX: Solo incluir canales que realmente tienen objetos definidos si no es preview
+        if not preview and cid not in CHANNEL_OBJS:
+            continue
+        if cid not in por_canal or not por_canal[cid]:
+            continue
+            
+        ch_name = cid.replace(" ", "_")
+        pdf_name_val = ch.get("label", cid).strip() or cid
+        label_safe = _pdf_safe_name(pdf_name_val)
+        
+        name_key = f"CS_{ch_name}"
+        if preview:
+            cs_entries.append(f"/{name_key} [/DeviceRGB]")
+        else:
+            oid = CHANNEL_OBJS[cid]
+            cs_entries.append(f"/{name_key} [/Separation /{label_safe} /DeviceCMYK {oid} 0 R]")
+            
     p_entries = [f"/{k} {v['obj']} 0 R" for k, v in PATTERN_OBJS.items()]
     
     res = f"<< /ExtGState << /GSOP {OBJ_GSOP} 0 R >> "
-    res += f"/ColorSpace << {' '.join(cs_entries)} >> "
-    if p_entries: res += f"/Pattern << {' '.join(p_entries)} >> "
-    if jpeg_bytes: res += f"/XObject << /Im0 {OBJ_IMAGE} 0 R >> "
+    if cs_entries:
+        res += f"/ColorSpace << {' '.join(cs_entries)} >> "
+    if p_entries:
+        res += f"/Pattern << {' '.join(p_entries)} >> "
+    if jpeg_bytes:
+        res += f"/XObject << /Im0 {OBJ_IMAGE} 0 R >> "
     res += ">>"
     
     obj_bodies[OBJ_PAGE] = f"<< /Type /Page /Parent {OBJ_PAGES} 0 R /MediaBox [0 0 {ancho} {alto}] /Resources {res} /Contents {OBJ_CONTENT} 0 R >>".encode()
