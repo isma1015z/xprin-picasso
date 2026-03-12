@@ -38,7 +38,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
       if (!res.ok) {
         const raw = await res.text()
         let detail = raw || res.statusText || 'Error del servidor'
-        try { detail = JSON.parse(raw).detail ?? detail } catch { }
+        try { detail = JSON.parse(raw).detail ?? detail } catch {}
         throw new Error(detail)
       }
       const data = await res.json()
@@ -86,7 +86,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
       if (!res.ok) {
         const raw = await res.text()
         let detail = raw || res.statusText
-        try { detail = JSON.parse(raw).detail ?? detail } catch { }
+        try { detail = JSON.parse(raw).detail ?? detail } catch {}
         throw new Error(detail)
       }
       const blob = await res.blob()
@@ -103,12 +103,11 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
     }
   }
 
+
   const spotCount = capas.filter((c) => c.spot !== null).length
 
   return (
     <header className="relative flex items-center justify-between h-[60px] px-6 bg-surface border-b border-border-strong shadow-sm z-10 w-full shrink-0 max-md:px-3">
-
-      {/* 1. Izquierda: Logo + nombre proyecto (Agregado flex-1 para balancear) */}
       <div className="flex items-center gap-4 min-w-0 flex-1">
         <button
           onClick={() => navigate('/proyectos')}
@@ -123,7 +122,6 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
           />
         </button>
 
-        {/* Restaurado: Input editable con lápiz que solo aparece si hay imagenUrl */}
         {imagenUrl && (
           <>
             <div className="w-px h-5 bg-border-strong max-md:hidden" />
@@ -145,9 +143,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
         )}
       </div>
 
-      {/* 2. Centro: Acciones estrictamente centradas (Agregado absolute y max-md:hidden) */}
       <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 max-md:hidden">
-        {/* Subir imagen */}
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={cargando}
@@ -161,22 +157,16 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
           }
           {cargando ? 'Detectando...' : imagenUrl ? 'Cambiar imagen' : 'Subir imagen'}
         </button>
-        <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp"
-          className="hidden" onChange={handleImageUpload} />
+        <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleImageUpload} />
 
-        {/* Ajustes detección */}
         <DetectionSettings />
 
-        {/* Error inline */}
         {errorMsg && (
           <span className="text-xs text-accent max-w-xs truncate" title={errorMsg}>{errorMsg}</span>
         )}
       </div>
 
-      {/* 3. Derecha: Exportar + contador spots + tema + reset (Agregado flex-1 y justify-end) */}
       <div className="flex items-center justify-end gap-3 flex-1 max-md:gap-2">
-
-        {/* Exportar PDF de escritorio (Oculto en móvil) */}
         {imagenUrl && (
           <div className="relative max-md:hidden">
             <div className={`flex rounded-md overflow-hidden border transition-all duration-200
@@ -206,33 +196,21 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
             </div>
 
             {exportMenu && (
-              <div className="absolute top-full right-0 mt-1 z-50 w-56 bg-surface rounded-lg shadow-xl
-                border border-border-strong overflow-hidden"
+              <div
+                className="absolute top-full right-0 mt-1 z-50 w-56 bg-surface rounded-lg shadow-xl border border-border-strong overflow-hidden"
                 onMouseLeave={() => setExportMenu(false)}
               >
-                <button
-                  onClick={() => handleExport({ embedImagen: true })}
-                  className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover
-                    transition-colors cursor-pointer"
-                >
+                <button onClick={() => handleExport({ embedImagen: true })} className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover transition-colors cursor-pointer">
                   <div className="font-medium">Con imagen</div>
                   <div className="text-xs text-muted">PDF completo para revisión</div>
                 </button>
                 <div className="border-t border-border-light" />
-                <button
-                  onClick={() => handleExport({ embedImagen: false })}
-                  className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover
-                    transition-colors cursor-pointer"
-                >
+                <button onClick={() => handleExport({ embedImagen: false })} className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover transition-colors cursor-pointer">
                   <div className="font-medium">Solo spots (RIP)</div>
                   <div className="text-xs text-muted">Sin imagen — más ligero para el RIP</div>
                 </button>
                 <div className="border-t border-border-light" />
-                <button
-                  onClick={() => handleExport({ embedImagen: true, preview: true })}
-                  className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover
-                    transition-colors cursor-pointer"
-                >
+                <button onClick={() => handleExport({ embedImagen: true, preview: true })} className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover transition-colors cursor-pointer">
                   <div className="font-medium">Preview (RGB)</div>
                   <div className="text-xs text-muted">Spots en color para verificar</div>
                 </button>
@@ -246,6 +224,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
             {spotCount}/{capas.length} spots
           </span>
         )}
+
 
         <button
           onClick={toggleTheme}
@@ -281,7 +260,6 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
         )}
       </div>
 
-      {/* Menú Móvil */}
       {isMobile && (
         <div
           className={`absolute top-full left-0 right-0 z-40 bg-surface border-b border-border-strong shadow-lg px-3 py-2
@@ -307,6 +285,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
             <div className="[&>div]:w-full [&>div>button]:h-10 [&>div>button]:w-full [&>div>button]:justify-center [&>div>button]:px-3 [&>div>button]:text-xs">
               <DetectionSettings />
             </div>
+
 
             {imagenUrl && (
               <button
@@ -347,24 +326,21 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
               </button>
 
               {exportMenu && (
-                <div className="absolute top-full left-0 mt-1 z-50 w-full bg-surface rounded-lg shadow-xl
-                    border border-border-strong overflow-hidden"
+                <div
+                  className="absolute top-full left-0 mt-1 z-50 w-full bg-surface rounded-lg shadow-xl border border-border-strong overflow-hidden"
                   onMouseLeave={() => setExportMenu(false)}
                 >
-                  <button onClick={() => handleExport({ embedImagen: true })}
-                    className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover transition-colors cursor-pointer">
+                  <button onClick={() => handleExport({ embedImagen: true })} className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover transition-colors cursor-pointer">
                     <div className="font-medium">Con imagen</div>
                     <div className="text-xs text-muted">PDF completo para revisión</div>
                   </button>
                   <div className="border-t border-border-light" />
-                  <button onClick={() => handleExport({ embedImagen: false })}
-                    className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover transition-colors cursor-pointer">
+                  <button onClick={() => handleExport({ embedImagen: false })} className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover transition-colors cursor-pointer">
                     <div className="font-medium">Solo spots (RIP)</div>
                     <div className="text-xs text-muted">Sin imagen — más ligero para el RIP</div>
                   </button>
                   <div className="border-t border-border-light" />
-                  <button onClick={() => handleExport({ embedImagen: true, preview: true })}
-                    className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover transition-colors cursor-pointer">
+                  <button onClick={() => handleExport({ embedImagen: true, preview: true })} className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-surface-hover transition-colors cursor-pointer">
                     <div className="font-medium">Preview (RGB)</div>
                     <div className="text-xs text-muted">Spots en color para verificar</div>
                   </button>
@@ -378,6 +354,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
           )}
         </div>
       )}
+
     </header>
   )
 }
