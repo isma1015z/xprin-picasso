@@ -48,6 +48,22 @@ export const useStore = create((set, get) => ({
   setSettingsOpen:  (v)    => set({ settingsOpen: v }),
   setLastFile:      (file) => set({ lastFile: file }),
 
+  cargarProyectoGuardado: (p) =>
+    set((s) => ({
+      proyectoId: p.proyectoId ?? p.id ?? null,
+      proyectoNombre: p.nombre ?? 'Proyecto',
+      imagenUrl: p.imagenDataUrl ?? null,
+      imagenSize: { ancho: p.ancho ?? 0, alto: p.alto ?? 0 },
+      capas: Array.isArray(p.capas) ? p.capas : [],
+      capaActivaId: Array.isArray(p.capas) && p.capas.length > 0 ? p.capas[0].id : null,
+      settings: p.settings ? { ...DEFAULT_SETTINGS, ...p.settings } : s.settings,
+      settingsOpen: false,
+      cargando: false,
+      errorMsg: null,
+      exportandoPDF: false,
+      lastFile: null,
+    })),
+
   asignarSpot: (capaId, spot) =>
     set((s) => ({
       capas: s.capas.map((c) =>

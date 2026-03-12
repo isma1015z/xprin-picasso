@@ -51,7 +51,7 @@ export function Login() {
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) throw authError;
-      navPrint('/editor');
+      navPrint('/proyectos');
     } catch (err) {
       setError(err.message ?? 'Error al iniciar sesión');
     } finally {
