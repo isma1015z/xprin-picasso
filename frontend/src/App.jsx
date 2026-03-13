@@ -8,6 +8,8 @@ import { ActualizarContrasena } from './pages/ActualizarContrasena'
 import { Editor }               from './pages/Editor'
 import { ProjectsMenu }         from './pages/ProjectsMenu'
 import { Ayuda }                from './pages/Ayuda'
+import { MiCuenta }             from './pages/MiCuenta'
+import { Configuracion }        from './pages/Configuracion'
 import { RequireAuth }          from './components/RequireAuth'
 import { useStore } from './store'
 
@@ -52,6 +54,22 @@ export default function App() {
         <Route path="/recuperar"             element={<RecuperarContrasena />}  />
         <Route path="/actualizar-contrasena" element={<ActualizarContrasena />} />
         <Route path="/proyectos"             element={<ProjectsMenu />}         />
+        <Route
+          path="/mi-cuenta"
+          element={(
+            <RequireAuth>
+              <MiCuenta />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/configuracion"
+          element={(
+            <RequireAuth>
+              <Configuracion />
+            </RequireAuth>
+          )}
+        />
         <Route
           path="/ayuda"
           element={(

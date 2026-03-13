@@ -112,14 +112,12 @@ export function ProjectsMenu() {
     <main className="min-h-screen bg-base text-primary px-2 py-4 sm:px-4 sm:py-6 md:px-8 md:py-8">
       <div className="mx-auto w-full max-w-none sm:max-w-6xl">
         <div className="mb-4 rounded-xl border border-red-500/25 bg-gradient-to-r from-red-600/10 via-surface to-red-500/5 px-3 py-3 shadow-sm sm:mb-6 sm:rounded-2xl sm:px-4 sm:py-4 md:px-6 md:py-5">
-          <div className="mb-3 flex items-center justify-start">
-            <UserProfileBadge />
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[10px] uppercase tracking-[0.14em] text-muted sm:text-xs sm:tracking-[0.16em]">XPRIN Picasso</p>
               <h1 className="text-xl font-outfit font-semibold sm:text-2xl md:text-3xl">Mis proyectos</h1>
             </div>
+            <UserProfileBadge />
           </div>
         </div>
 

@@ -2,7 +2,10 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.requests import Request
+from pydantic import BaseModel, EmailStr
 from dotenv import load_dotenv
+from email.message import EmailMessage
+import smtplib
 import os, uuid, json, traceback
 
 load_dotenv()
@@ -19,6 +22,13 @@ IMG_DIR    = os.path.join(os.path.dirname(__file__), "img", "uploads")
 EXPORT_DIR = os.path.join(os.path.dirname(__file__), "img", "exports")
 os.makedirs(IMG_DIR,    exist_ok=True)
 os.makedirs(EXPORT_DIR, exist_ok=True)
+
+
+class SupportContactPayload(BaseModel):
+    topic: str
+    sender_email: EmailStr
+    message: str
+    sender_name: str | None = None
 
 
 def quitar_fondo(imagen_bytes: bytes) -> bytes:
@@ -46,6 +56,50 @@ def capa_tiene_spots(capa: dict) -> bool:
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "0.9.0"}
+
+
+@app.post("/contact-support")
+async def contact_support(payload: SupportContactPayload):
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    support_email = os.getenv("SUPPORT_EMAIL")
+    from_email = os.getenv("SMTP_FROM_EMAIL") or smtp_user or support_email
+    use_tls = os.getenv("SMTP_USE_TLS", "true").lower() != "false"
+
+    if not smtp_host or not smtp_user or not smtp_password or not support_email or not from_email:
+        raise HTTPException(status_code=503, detail="Servicio de soporte no configurado.")
+
+    body = (
+        "Nuevo mensaje desde XPRIN Picasso\n\n"
+        f"Asunto: {payload.topic}\n"
+        f"Remitente: {payload.sender_name or 'No indicado'}\n"
+        f"Email remitente: {payload.sender_email}\n\n"
+        "Mensaje:\n"
+        f"{payload.message.strip()}\n"
+    )
+
+    msg = EmailMessage()
+    msg["Subject"] = f"[XPRIN] {payload.topic}"
+    msg["From"] = from_email
+    msg["To"] = support_email
+    msg["Reply-To"] = str(payload.sender_email)
+    msg.set_content(body)
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+            server.ehlo()
+            if use_tls:
+                server.starttls()
+                server.ehlo()
+            server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"No se pudo enviar el mensaje: {e}")
+
+    return {"ok": True, "detail": "Mensaje enviado correctamente."}
 
 
 @app.get("/uploads/{filename}")

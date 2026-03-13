@@ -107,7 +107,7 @@ export function UserProfileBadge() {
       </button>
 
       <div
-        className={`absolute left-0 top-[calc(100%+10px)] z-[180] w-[300px] max-w-[88vw] overflow-hidden rounded-2xl border border-red-500/25 bg-surface shadow-[0_20px_45px_rgba(0,0,0,0.28)] transition-all duration-200 ${
+        className={`absolute right-0 top-[calc(100%+10px)] z-[180] w-[300px] max-w-[88vw] overflow-hidden rounded-2xl border border-red-500/25 bg-surface shadow-[0_20px_45px_rgba(0,0,0,0.28)] transition-all duration-200 ${
           open ? 'pointer-events-auto translate-y-0 opacity-100 scale-100' : 'pointer-events-none -translate-y-1 opacity-0 scale-[0.98]'
         }`}
       >
@@ -130,7 +130,7 @@ export function UserProfileBadge() {
         <div className="p-2">
           <button
             type="button"
-            onClick={() => { setOpen(false); navigate('/proyectos') }}
+            onClick={() => { setOpen(false); navigate('/mi-cuenta') }}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-secondary hover:bg-surface-elevated hover:text-primary transition-colors cursor-pointer"
           >
             <UserRound size={16} />
@@ -146,7 +146,7 @@ export function UserProfileBadge() {
           </button>
           <button
             type="button"
-            onClick={() => setOpen(false)}
+            onClick={() => { setOpen(false); navigate('/configuracion') }}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-secondary hover:bg-surface-elevated hover:text-primary transition-colors cursor-pointer"
           >
             <Settings size={16} />
