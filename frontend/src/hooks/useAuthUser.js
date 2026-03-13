@@ -15,11 +15,27 @@ export function useAuthUser() {
   useEffect(() => {
     let mounted = true
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (!mounted) return
-      setUser(data?.user ?? null)
-      setLoading(false)
-    })
+    const initializeAuth = async () => {
+      try {
+        // Refrescar la sesión para asegurar persistencia
+        const { data, error } = await supabase.auth.refreshSession()
+        if (error) {
+          console.log('Error refreshing session:', error)
+        }
+        if (mounted) {
+          setUser(data?.user ?? null)
+          setLoading(false)
+        }
+      } catch (err) {
+        console.log('Error initializing auth:', err)
+        if (mounted) {
+          setUser(null)
+          setLoading(false)
+        }
+      }
+    }
+
+    initializeAuth()
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return

@@ -56,6 +56,8 @@ export function Registro() {
     setLoading(true); setError(null);
 
     try {
+      console.log('Intentando registro con:', { email, fullName, company });
+
       const validationString  = `${fullName}|${email}|${company}`;
       const dataValidationHash = await sha256(validationString);
 
@@ -66,11 +68,15 @@ export function Registro() {
           emailRedirectTo: window.location.origin + '/login',
         },
       });
+
+      console.log('Respuesta de signUp:', { data, signUpError });
+
       if (signUpError) throw signUpError;
 
       setRegistered(true); setLoading(false);
 
       if (data?.user) {
+        console.log('Insertando perfil para user ID:', data.user.id);
         const { error: profileError } = await supabase.from('profiles').upsert([
           { id: data.user.id, full_name: fullName, company, phone, address },
         ]);
@@ -80,6 +86,7 @@ export function Registro() {
       setIsPrinting(true);
       setTimeout(() => navigate('/login'), 1500);
     } catch (err) {
+      console.error('Error en registro:', err);
       setError(err.message); setLoading(false);
     }
   };

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CircleHelp, LogOut, Settings, SunMoon, UserRound } from 'lucide-react'
+import { CircleHelp, LogOut, Settings, UserRound } from 'lucide-react'
 import { useAuthUser } from '../hooks/useAuthUser'
 import { supabase } from '../lib/supabase'
 
@@ -56,14 +56,6 @@ export function UserProfileBadge() {
     } finally {
       setSigningOut(false)
     }
-  }
-
-  function handleThemeToggle() {
-    const current = localStorage.getItem('xprin-theme') || (document.documentElement.classList.contains('dark') ? 'dark' : 'light')
-    const next = current === 'dark' ? 'light' : 'dark'
-    localStorage.setItem('xprin-theme', next)
-    document.documentElement.classList.toggle('dark', next === 'dark')
-    setOpen(false)
   }
 
   if (loading) {
@@ -135,14 +127,6 @@ export function UserProfileBadge() {
           >
             <UserRound size={16} />
             Mi cuenta
-          </button>
-          <button
-            type="button"
-            onClick={handleThemeToggle}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-secondary hover:bg-surface-elevated hover:text-primary transition-colors cursor-pointer"
-          >
-            <SunMoon size={16} />
-            Cambiar tema
           </button>
           <button
             type="button"
