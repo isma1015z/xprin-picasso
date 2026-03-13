@@ -16,6 +16,7 @@ export async function saveState(state) {
       capas: state.capas,
       settings: state.settings,
       spotChannels: state.spotChannels,
+      lastActivity: Date.now(),
     };
     
     await set(STORE_NAME, stateToSave);

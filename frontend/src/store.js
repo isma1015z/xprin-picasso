@@ -120,10 +120,26 @@ export const useStore = create((set, get) => ({
     const savedFile = await getSavedFile();
 
     if (savedState) {
-      // Si el URL era un blob viejo, ya no sirve. Re-creamos desde el file si existe
+      // 1. Verificar expiración (15 min = 15 * 60 * 1000 ms)
+      const ahora = Date.now();
+      const ultimaActividad = savedState.lastActivity ?? ahora;
+      const quinceMinutos = 15 * 60 * 1000;
+
+      if (ahora - ultimaActividad > quinceMinutos) {
+        console.log('Sesión expirada (>15 min). Limpiando IndexedDB...');
+        await clearPersistedState();
+        return;
+      }
+
+      // 2. Si el URL era un blob viejo, ya no sirve. Re-creamos desde el file si existe
       let restoredUrl = savedState.imagenUrl;
       if (savedFile) {
         restoredUrl = URL.createObjectURL(savedFile);
+      } else if (restoredUrl && restoredUrl.startsWith('blob:')) {
+        // Si no tenemos el archivo y el URL es un blob expirado, el estado es inconsistente
+        console.warn('Imagen blob expirada y sin archivo de respaldo. Limpiando...');
+        await clearPersistedState();
+        return;
       }
 
       set({

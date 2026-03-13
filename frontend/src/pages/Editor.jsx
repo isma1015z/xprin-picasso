@@ -39,7 +39,6 @@ export function Editor() {
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-base text-primary font-inter">
       <Header
         theme={theme}
-        toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
         isMobile={isMobile}
         mobileMenuOpen={mobileMenuOpen}
         toggleMobileMenu={() => setMobileMenuOpen((v) => !v)}
