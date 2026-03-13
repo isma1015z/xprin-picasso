@@ -5,6 +5,13 @@ export function useAuthUser() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  async function refreshUser() {
+    const { data } = await supabase.auth.getUser()
+    setUser(data?.user ?? null)
+    setLoading(false)
+    return data?.user ?? null
+  }
+
   useEffect(() => {
     let mounted = true
 
@@ -26,5 +33,5 @@ export function useAuthUser() {
     }
   }, [])
 
-  return { user, loading }
+  return { user, loading, refreshUser }
 }
