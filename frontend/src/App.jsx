@@ -8,8 +8,11 @@ import { ActualizarContrasena } from './pages/ActualizarContrasena'
 import { Editor }               from './pages/Editor'
 import { ProjectsMenu }         from './pages/ProjectsMenu'
 import { Ayuda }                from './pages/Ayuda'
+import { MiCuenta }             from './pages/MiCuenta'
+import { Configuracion }        from './pages/Configuracion'
 import { RequireAuth }          from './components/RequireAuth'
 import { useStore } from './store'
+import { supabase } from './lib/supabase'
 
 export default function App() {
   const rehidratarStore = useStore((s) => s.rehidratarStore);
@@ -17,6 +20,15 @@ export default function App() {
   useEffect(() => {
     rehidratarStore();
   }, [rehidratarStore]);
+
+  useEffect(() => {
+    // Refrescar la sesión de Supabase al cargar la app para asegurar persistencia
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        console.log('Sesión recuperada:', session.user.email);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -52,6 +64,22 @@ export default function App() {
         <Route path="/recuperar"             element={<RecuperarContrasena />}  />
         <Route path="/actualizar-contrasena" element={<ActualizarContrasena />} />
         <Route path="/proyectos"             element={<ProjectsMenu />}         />
+        <Route
+          path="/mi-cuenta"
+          element={(
+            <RequireAuth>
+              <MiCuenta />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/configuracion"
+          element={(
+            <RequireAuth>
+              <Configuracion />
+            </RequireAuth>
+          )}
+        />
         <Route
           path="/ayuda"
           element={(

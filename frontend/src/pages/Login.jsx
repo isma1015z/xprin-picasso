@@ -67,7 +67,7 @@ export function Login() {
     setIsPrinting(true);
     setTimeout(() => {
       setLoading(false);
-      navigate('/editor');
+      navigate('/proyectos');
     }, 1500);
   };
 
