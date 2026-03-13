@@ -1,106 +1,113 @@
-// Login — XPRIN-Picasso
-// Responsable: Jorge
-// Supabase auth conectado
-
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase';
+import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
-import textureBg   from '../assets/images/texture-200.png';
-import videoprueba from '../assets/images/videoprueba.mp4';
-import videoXp     from '../assets/images/videoxp_6206.mp4';
-import prueba2     from '../assets/images/prueba2.jpg';
+// Importar media de fondo
+import textureBg    from '../assets/images/texture-200.png';
+import videoprueba  from '../assets/images/videoprueba.mp4';
+import videoXp      from '../assets/images/videoxp_6206.mp4';
+import prueba2      from '../assets/images/prueba2.jpg';
+import logoBlanco   from '../assets/images/Logo_Blanco.png';
+import logoColor    from '../assets/images/Picsart_26-03-10_10-02-37-011.png';
 
 export function Login() {
-  const [email,      setEmail]      = useState('');
-  const [password,   setPassword]   = useState('');
-  const [error,      setError]      = useState(null);
-  const [loading,    setLoading]    = useState(false);
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [mediaIndex, setMediaIndex] = useState(0);
+  const [error, setError]         = useState(null);
+  const [loading, setLoading]     = useState(false);
+  const navigate = useNavigate();
 
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const video1Ref = useRef(null);
   const video2Ref = useRef(null);
-  const navigate  = useNavigate();
 
-  // Carrusel: Textura 3.5s → Video1 → Video2 → Imagen 8s → reinicio
   useEffect(() => {
     document.title = 'XPRIN - Acceso al Portal';
+
     let timer;
-    if (mediaIndex === 0) {
-      timer = setTimeout(() => setMediaIndex(1), 3500);
-    } else if (mediaIndex === 1) {
-      video1Ref.current?.play().catch(() => {});
-    } else if (mediaIndex === 2) {
-      video2Ref.current?.play().catch(() => {});
-    } else if (mediaIndex === 3) {
-      timer = setTimeout(() => setMediaIndex(0), 8000);
+    if (currentMediaIndex === 0) {
+      timer = setTimeout(() => setCurrentMediaIndex(1), 3500);
+    } else if (currentMediaIndex === 1) {
+      if (video1Ref.current) {
+        video1Ref.current.currentTime = 0;
+        video1Ref.current.play().catch(e => console.log('Autoplay prevented:', e));
+      }
+    } else if (currentMediaIndex === 2) {
+      if (video2Ref.current) {
+        video2Ref.current.currentTime = 0;
+        video2Ref.current.play().catch(e => console.log('Autoplay prevented:', e));
+      }
+    } else if (currentMediaIndex === 3) {
+      timer = setTimeout(() => setCurrentMediaIndex(0), 8000);
     }
+
     return () => clearTimeout(timer);
-  }, [mediaIndex]);
+  }, [currentMediaIndex]);
 
-  const navPrint = (path) => {
-    setIsPrinting(true);
-    setTimeout(() => navigate(path), 1500);
-  };
-
-  const handleSubmit = async (e) => {
+  const handleSubmitEmail = async (e) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
+    setError(null);
+
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) throw authError;
-      navPrint('/proyectos');
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
+      handleSuccess();
     } catch (err) {
-      setError(err.message ?? 'Error al iniciar sesión');
-    } finally {
+      setError(err.message === 'Invalid login credentials'
+        ? 'Correo o contraseña incorrectos'
+        : err.message);
       setLoading(false);
     }
   };
 
+  const handleSuccess = () => {
+    setIsPrinting(true);
+    setTimeout(() => {
+      setLoading(false);
+      navigate('/editor');
+    }, 1500);
+  };
+
+  const handleRegisterClick = (e) => {
+    e.preventDefault();
+    setIsPrinting(true);
+    setTimeout(() => navigate('/registro'), 1500);
+  };
+
   return (
     <>
-      {/* Overlay de transición */}
+      {/* CAPA DE TRANSICIÓN */}
       <div className={`fixed inset-0 z-50 bg-brand-white pointer-events-none flex flex-col items-center justify-center transition-transform duration-[1500ms] ease-in-out ${isPrinting ? 'translate-y-0' : '-translate-y-full'}`}>
-        <div className="absolute inset-x-0 bottom-0 h-1 bg-brand-cyan shadow-[0_0_20px_#0085C8] animate-pulse" />
-        <div className="w-16 h-16 border-4 border-brand-red border-t-transparent rounded-full animate-spin mb-8" />
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-brand-cyan shadow-[0_0_20px_#0085C8] animate-pulse"></div>
+        <div className="w-16 h-16 border-4 border-brand-red border-t-transparent rounded-full animate-spin mb-8"></div>
         <h2 className="text-2xl font-bold text-brand-dark tracking-[0.2em]">PROCESANDO...</h2>
       </div>
 
       <div className={`flex min-h-screen bg-brand-white transition-opacity duration-700 ${isPrinting ? 'opacity-0' : 'opacity-100'}`}>
-
-        {/* ── Columna izquierda: carrusel multimedia ── */}
+        {/* Sección Izquierda */}
         <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between overflow-hidden bg-brand-dark">
-          {/* Capa 0: Textura */}
-          <div
-            className={`absolute inset-0 transition-opacity duration-1000 ${mediaIndex === 0 ? 'opacity-100' : 'opacity-0'}`}
+          <div className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${currentMediaIndex === 0 ? 'opacity-100' : 'opacity-0'}`}
             style={{ backgroundImage: `url(${textureBg})`, backgroundSize: '600px', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', imageRendering: 'pixelated' }}
           />
-          {/* Capa 1: Video 1 */}
-          <video ref={video1Ref} muted playsInline onEnded={() => setMediaIndex(2)}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${mediaIndex === 1 ? 'opacity-100' : 'opacity-0'}`}
-            src={videoprueba}
+          <video ref={video1Ref} muted playsInline onEnded={() => setCurrentMediaIndex(2)}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out ${currentMediaIndex === 1 ? 'opacity-100' : 'opacity-0'}`}
+            src={videoprueba} />
+          <video ref={video2Ref} muted playsInline onEnded={() => setCurrentMediaIndex(3)}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out ${currentMediaIndex === 2 ? 'opacity-100' : 'opacity-0'}`}
+            src={videoXp} />
+          <div className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${currentMediaIndex === 3 ? 'opacity-100' : 'opacity-0'}`}
+            style={{ backgroundImage: `url(${prueba2})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
           />
-          {/* Capa 2: Video 2 */}
-          <video ref={video2Ref} muted playsInline onEnded={() => setMediaIndex(3)}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${mediaIndex === 2 ? 'opacity-100' : 'opacity-0'}`}
-            src={videoXp}
-          />
-          {/* Capa 3: Imagen */}
-          <div
-            className={`absolute inset-0 transition-opacity duration-1000 ${mediaIndex === 3 ? 'opacity-100' : 'opacity-0'}`}
-            style={{ backgroundImage: `url(${prueba2})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-          />
-          <div className="absolute inset-0 bg-brand-dark opacity-10" />
-          <div className={`absolute inset-0 bg-[radial-gradient(#E41C24_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none transition-opacity duration-1000 ${mediaIndex === 0 ? 'opacity-20' : 'opacity-0'}`} />
+          <div className="absolute inset-0 bg-brand-dark opacity-10"></div>
+          <div className={`absolute inset-0 bg-[radial-gradient(#E41C24_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none transition-opacity duration-1000 ease-in-out ${currentMediaIndex === 0 ? 'opacity-20' : 'opacity-0'}`}></div>
 
           <div className="relative z-10 p-12">
-            <div onClick={() => navPrint('/')} className="inline-flex items-center gap-3 group hover:opacity-90 transition-opacity cursor-pointer">
-              <div className="w-10 h-10 bg-brand-red rounded-sm flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                <span className="text-brand-white font-bold text-xl">X</span>
-              </div>
-              <span className="text-2xl font-black text-brand-white tracking-tight drop-shadow-md">XPRIN</span>
+            <div onClick={() => { setIsPrinting(true); setTimeout(() => navigate('/'), 1500); }}
+              className="inline-flex items-center group hover:opacity-90 transition-opacity cursor-pointer">
+              <img src={logoBlanco} alt="XPRIN Logo" className="h-12 w-auto object-contain group-hover:scale-105 transition-transform" />
             </div>
           </div>
 
@@ -108,93 +115,81 @@ export function Login() {
             <h1 className="text-4xl lg:text-5xl font-extrabold text-brand-white leading-tight mb-2 drop-shadow-md">
               Soluciones de impresión de alta precisión.
             </h1>
-            <p className="text-xl font-semibold text-brand-cyan mb-4 tracking-wide drop-shadow-md">Marcamos la diferencia</p>
+            <p className="text-xl font-semibold text-brand-red mb-4 tracking-wide drop-shadow-md">Marcamos la diferencia</p>
             <p className="text-lg text-brand-gray max-w-md opacity-90 drop-shadow-md">
               Gestiona tus proyectos, revisa tus pedidos y accede a nuestra plataforma de producción centralizada.
             </p>
           </div>
         </div>
 
-        {/* ── Columna derecha: formulario ── */}
+        {/* Sección Derecha */}
         <div className="flex-1 flex flex-col justify-center px-6 py-12 lg:px-20 xl:px-32 bg-brand-white/90 backdrop-blur-xl shadow-[-20px_0_50px_rgba(0,0,0,0.1)] z-10 relative border-l border-brand-white/20">
           <div className="mx-auto w-full max-w-sm lg:max-w-md animate-fade-in-up">
-
-            {/* Logo móvil */}
-            <div onClick={() => navPrint('/')} className="flex lg:hidden items-center gap-3 mb-8 group cursor-pointer">
-              <div className="w-10 h-10 bg-brand-red rounded-sm flex items-center justify-center group-hover:scale-105 transition-transform shadow-lg shadow-brand-red/20">
-                <span className="text-brand-white font-bold text-xl">X</span>
-              </div>
-              <span className="text-2xl font-black text-brand-dark tracking-tight">XPRIN</span>
+            <div onClick={() => { setIsPrinting(true); setTimeout(() => navigate('/'), 1500); }}
+              className="flex lg:hidden items-center mb-8 group cursor-pointer">
+              <img src={logoColor} alt="XPRIN Logo" className="h-10 w-auto object-contain group-hover:scale-105 transition-transform" />
             </div>
 
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-brand-dark mt-2 lg:mt-0 mb-1">
-              Acceso al portal
-            </h2>
-            <p className="text-xs sm:text-sm text-brand-carbon/60 font-medium mb-8 sm:mb-10">
-              Credenciales corporativas de alta seguridad
-            </p>
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-brand-dark mt-2 lg:mt-0 mb-1 leading-none">Acceso al portal</h2>
+            <p className="text-xs sm:text-sm text-brand-carbon/60 font-medium mb-6">Tu portal exclusivo para la gestión de proyectos de impresión.</p>
 
-            <form className="space-y-6" onSubmit={handleSubmit}>
-              {/* Error */}
-              {error && (
-                <div className="rounded-sm bg-brand-red/10 border border-brand-red/30 px-4 py-3 text-sm text-brand-red font-medium">
-                  {error}
-                </div>
-              )}
+            {error && (
+              <div className="mb-6 p-3 bg-brand-red/10 border-l-4 border-brand-red text-brand-red text-xs font-bold rounded-sm animate-fade-in-up">{error}</div>
+            )}
 
-              {/* Email */}
+            <form className="space-y-6" onSubmit={handleSubmitEmail}>
               <div className="group">
                 <label htmlFor="email" className="block text-xs font-bold text-brand-carbon/60 uppercase tracking-widest mb-2 transition-colors group-focus-within:text-brand-red">
                   Correo electrónico profesional
                 </label>
                 <div className="relative">
-                  <input
-                    id="email" name="email" type="email" autoComplete="email" required
-                    placeholder="ejemplo@empresa.com"
+                  <input id="email" type="email" required placeholder="ejemplo@empresa.com"
                     value={email} onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full bg-brand-white rounded-sm py-3.5 sm:py-4 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/50 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 transition-all outline-none text-sm"
-                  />
-                  <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500" />
+                    className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-4 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none text-sm leading-6" />
+                  <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
                 </div>
               </div>
 
-              {/* Contraseña */}
               <div className="group">
                 <div className="flex items-center justify-between mb-2">
                   <label htmlFor="password" className="block text-xs font-bold text-brand-carbon/60 uppercase tracking-widest transition-colors group-focus-within:text-brand-red">
                     Contraseña
                   </label>
-                  <a href="#" className="text-xs font-bold text-brand-cyan hover:text-brand-red transition-colors uppercase tracking-tighter">
+                  <Link to="/recuperar"
+                    onClick={(e) => { e.preventDefault(); setIsPrinting(true); setTimeout(() => navigate('/recuperar'), 1500); }}
+                    className="text-xs font-bold text-brand-cyan hover:text-brand-red transition-colors uppercase tracking-tighter">
                     ¿Olvidaste tu contraseña?
-                  </a>
+                  </Link>
                 </div>
                 <div className="relative">
-                  <input
-                    id="password" name="password" type="password" autoComplete="current-password" required
-                    placeholder="••••••••"
+                  <input id="password" type="password" required placeholder="••••••••"
                     value={password} onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full bg-brand-white rounded-sm py-3.5 sm:py-4 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/50 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 transition-all outline-none text-sm"
-                  />
-                  <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500" />
+                    className="block w-full bg-brand-white border-brand-gray/30 rounded-sm py-4 px-4 text-brand-dark shadow-sm ring-1 ring-inset ring-brand-gray/20 placeholder:text-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-red/50 focus:bg-white transition-all outline-none text-sm leading-6" />
+                  <div className="absolute bottom-0 left-0 h-0.5 bg-brand-red w-0 group-focus-within:w-full transition-all duration-500"></div>
                 </div>
               </div>
 
-              <button
-                type="submit" disabled={loading}
-                className="group relative flex w-full justify-center rounded-sm bg-brand-red px-3 py-4 text-sm font-bold text-brand-white shadow-xl shadow-brand-red/20 overflow-hidden transition-all hover:scale-[1.02] active:scale-[0.98] outline-none disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <span className="relative z-10 tracking-widest">
-                  {loading ? 'VERIFICANDO...' : 'ACCEDER A LA PLATAFORMA'}
-                </span>
-                <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] -translate-x-full group-hover:animate-shimmer" />
+              <div className="flex items-center gap-2 py-2">
+                <input id="remember-me" type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-brand-gray/50 text-brand-red focus:ring-brand-red cursor-pointer accent-brand-red" />
+                <label htmlFor="remember-me" className="text-xs font-bold text-brand-carbon/60 uppercase tracking-tighter cursor-pointer select-none">
+                  Mantener sesión iniciada
+                </label>
+              </div>
+
+              <button type="submit" disabled={loading}
+                className={`group relative flex w-full justify-center rounded-sm bg-brand-red px-3 py-4 text-sm font-bold text-brand-white shadow-xl shadow-brand-red/20 overflow-hidden outline-none transition-all ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:scale-[1.02] active:scale-[0.98]'}`}>
+                <span className="relative z-10 tracking-[0.2em]">{loading ? 'ACCEDIENDO...' : 'ACCEDER A LA PLATAFORMA'}</span>
+                {!loading && <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] -translate-x-full group-hover:animate-shimmer"></div>}
               </button>
             </form>
 
             <div className="mt-10 text-center text-sm text-brand-carbon opacity-80">
               ¿No tienes cuenta corporativa?{' '}
-              <button onClick={() => navPrint('/registro')} className="font-semibold text-brand-cyan hover:opacity-80 transition-colors">
+              <a href="/registro" onClick={handleRegisterClick}
+                className="font-semibold leading-6 text-brand-cyan hover:opacity-80 transition-colors">
                 Solicita acceso aquí
-              </button>
+              </a>
             </div>
           </div>
         </div>
