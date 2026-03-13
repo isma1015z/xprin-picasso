@@ -12,6 +12,7 @@ import { MiCuenta }             from './pages/MiCuenta'
 import { Configuracion }        from './pages/Configuracion'
 import { RequireAuth }          from './components/RequireAuth'
 import { useStore } from './store'
+import { supabase } from './lib/supabase'
 
 export default function App() {
   const rehidratarStore = useStore((s) => s.rehidratarStore);
@@ -19,6 +20,15 @@ export default function App() {
   useEffect(() => {
     rehidratarStore();
   }, [rehidratarStore]);
+
+  useEffect(() => {
+    // Refrescar la sesión de Supabase al cargar la app para asegurar persistencia
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        console.log('Sesión recuperada:', session.user.email);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
