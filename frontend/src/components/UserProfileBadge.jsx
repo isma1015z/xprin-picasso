@@ -77,6 +77,8 @@ export function UserProfileBadge() {
     localStorage.setItem('xprin-theme', next)
     document.documentElement.classList.toggle('dark', next === 'dark')
     setTheme(next)
+    // Notifica a otros componentes (ej. Header) del cambio de tema
+    window.dispatchEvent(new CustomEvent('xprin-theme-change', { detail: next }))
     setOpen(false)
   }
 
@@ -171,7 +173,7 @@ export function UserProfileBadge() {
             {theme === 'dark' ? (
               <Sun className="h-4 w-4 text-yellow-400 transition-transform duration-300" />
             ) : (
-              <Moon className="h-4 w-4 text-slate-500 transition-transform duration-300" />
+              <Moon className="h-4 w-4 text-blue-500 transition-transform duration-300" />
             )}
             Cambiar fondo
           </button>

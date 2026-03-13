@@ -1,7 +1,7 @@
 // Header — diseño de Prueba_EditorPicasso + funcionalidad XPRIN-Picasso
 // Subir imagen · Ajustes de detección · Exportar PDF · Tema
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Upload, FileDown, ChevronDown, LogOut, Menu, X, Save } from 'lucide-react'
 import { useStore } from '../store'
@@ -15,13 +15,39 @@ import lapizBlanco from '../assets/images/lapizBlanco.png'
 import logo from '../assets/images/Logo_Negro.png'
 import logoBlanco from '../assets/images/Logo_Blanco.png'
 
-export function Header({ theme, isMobile = false, mobileMenuOpen = false, toggleMobileMenu = () => { } }) {
+export function Header({ theme: themeProp, isMobile = false, mobileMenuOpen = false, toggleMobileMenu = () => { } }) {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [exportMenu, setExportMenu] = useState(false)
   const [showExitModal, setShowExitModal] = useState(false)
   const [isSavingOnExit, setIsSavingOnExit] = useState(false)
   const [pendingFile, setPendingFile] = useState(null)
+  const [theme, setTheme] = useState(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('xprin-theme') : null
+    if (stored === 'dark' || stored === 'light') return stored
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  })
+
+  useEffect(() => {
+    const onStorage = (event) => {
+      if (event.key === 'xprin-theme' && (event.newValue === 'dark' || event.newValue === 'light')) {
+        setTheme(event.newValue)
+      }
+    }
+
+    const onThemeChange = (event) => {
+      if (event?.detail === 'dark' || event?.detail === 'light') {
+        setTheme(event.detail)
+      }
+    }
+
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('xprin-theme-change', onThemeChange)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('xprin-theme-change', onThemeChange)
+    }
+  }, [])
 
   const {
     imagenUrl, capas, cargando, exportandoPDF, errorMsg,
@@ -82,7 +108,8 @@ export function Header({ theme, isMobile = false, mobileMenuOpen = false, toggle
     setShowExitModal(false)
   }
 
-  const logoSrc = theme === 'dark' ? logoBlanco : logo
+  // Prefer the internal `theme` state (keeps logo in sync with theme changes from the profile menu)
+  const logoSrc = (theme || themeProp) === 'dark' ? logoBlanco : logo
 
   // spotCount: capas que tienen al menos un spot activo
   const spotCount = capas.filter((c) => (c.spots ?? []).length > 0).length
@@ -190,7 +217,13 @@ export function Header({ theme, isMobile = false, mobileMenuOpen = false, toggle
           className="h-6 w-28 flex items-center cursor-pointer"
           title="Ir a mis proyectos"
         >
-          <img src={logoSrc} alt="XPRIN-Picasso" className="h-full w-full object-contain select-none" draggable={false} />
+          <img
+            key={themeProp || theme}
+            src={logoSrc}
+            alt="XPRIN-Picasso"
+            className="h-full w-full object-contain select-none transition-opacity duration-300"
+            draggable={false}
+          />
         </button>
 
         {imagenUrl && (
