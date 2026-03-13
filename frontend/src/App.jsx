@@ -15,6 +15,20 @@ export default function App() {
   }, [rehidratarStore]);
 
   useEffect(() => {
+    const checkSession = async () => {
+      // Usar sessionStorage para detectar si es la misma pestaña/sesión
+      const sessionActive = sessionStorage.getItem('xprin-session-active');
+      if (!sessionActive) {
+        console.log('Nueva sesión detectada. Limpiando estado persistido...');
+        const { useStore } = await import('./store');
+        await useStore.getState().resetEditor();
+        sessionStorage.setItem('xprin-session-active', 'true');
+      }
+    };
+    checkSession();
+  }, []);
+
+  useEffect(() => {
     const handleBeforeUnload = (e) => {
       const { proyectoId } = useStore.getState();
       if (proyectoId) {

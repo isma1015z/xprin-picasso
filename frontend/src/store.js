@@ -135,6 +135,11 @@ export const useStore = create((set, get) => ({
       let restoredUrl = savedState.imagenUrl;
       if (savedFile) {
         restoredUrl = URL.createObjectURL(savedFile);
+      } else if (restoredUrl && restoredUrl.startsWith('blob:')) {
+        // Si no tenemos el archivo y el URL es un blob expirado, el estado es inconsistente
+        console.warn('Imagen blob expirada y sin archivo de respaldo. Limpiando...');
+        await clearPersistedState();
+        return;
       }
 
       set({

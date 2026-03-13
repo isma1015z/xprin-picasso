@@ -20,6 +20,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
   const [exportMenu, setExportMenu] = useState(false)
   const [showExitModal, setShowExitModal] = useState(false)
   const [isSavingOnExit, setIsSavingOnExit] = useState(false)
+  const [pendingFile, setPendingFile] = useState(null)
 
   const {
     imagenUrl, capas, cargando, exportandoPDF, errorMsg,
@@ -50,9 +51,16 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
       })
       
       setSavedProfileId(savedRecord.id)
-      await resetEditor()
+      
+      if (pendingFile) {
+        // Si venimos de un cambio de imagen
+        await processImageData(pendingFile)
+        setPendingFile(null)
+      } else {
+        await resetEditor()
+        navigate('/proyectos')
+      }
       setShowExitModal(false)
-      navigate('/proyectos')
     } catch (err) {
       console.error(err)
       setError("Error al guardar antes de salir")
@@ -62,9 +70,15 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
   }
 
   async function handleConfirmDiscard() {
-    await resetEditor()
+    if (pendingFile) {
+      // Si venimos de un cambio de imagen
+      await processImageData(pendingFile)
+      setPendingFile(null)
+    } else {
+      await resetEditor()
+      navigate('/proyectos')
+    }
     setShowExitModal(false)
-    navigate('/proyectos')
   }
 
   const logoSrc = theme === 'dark' ? logoBlanco : logo
@@ -76,6 +90,18 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
   async function handleImageUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
+
+    if (imagenUrl) {
+      setPendingFile(file)
+      setShowExitModal(true)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    await processImageData(file)
+  }
+
+  async function processImageData(file) {
     setCargando(true)
     setError(null)
     try {
@@ -87,7 +113,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
       if (!res.ok) {
         const raw = await res.text()
         let detail = raw || res.statusText || 'Error del servidor'
-        try { detail = JSON.parse(raw).detail ?? detail } catch {}
+        try { detail = JSON.parse(raw).detail ?? detail } catch { }
         throw new Error(detail)
       }
       const data = await res.json()
@@ -104,7 +130,8 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
     } catch (err) {
       setError(err.message)
     } finally {
-      setCargando(false)
+      setCargando(true) // Temporalmente para refrescar, luego false
+      setTimeout(() => setCargando(false), 500)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
@@ -282,7 +309,15 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
         open={showExitModal}
         onSave={handleConfirmSave}
         onDiscard={handleConfirmDiscard}
-        onCancel={() => setShowExitModal(false)}
+        onCancel={() => {
+          setShowExitModal(false)
+          setPendingFile(null)
+        }}
+        title={pendingFile ? "¿Cambiar imagen actual?" : "¿Cerrar proyecto actual?"}
+        description={pendingFile 
+          ? "Si cambias la imagen sin guardar, los cambios en este proyecto se perderán." 
+          : "Aún tienes cambios sin guardar en \"Mis proyectos\"."
+        }
       />
 
       {isMobile && (

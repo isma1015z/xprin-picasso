@@ -1,8 +1,11 @@
 import { createPortal } from 'react-dom'
 import { AlertCircle, Save, Trash2, X } from 'lucide-react'
 
-export function ConfirmExitModal({ open, onSave, onDiscard, onCancel }) {
+export function ConfirmExitModal({ open, onSave, onDiscard, onCancel, title, description }) {
   if (!open || typeof document === 'undefined') return null
+
+  const modalTitle = title || "¿Cerrar proyecto actual?"
+  const modalDesc = description || "Aún tienes cambios sin guardar en \"Mis proyectos\"."
 
   return createPortal(
     <div className="fixed inset-0 z-[200] grid place-items-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -16,8 +19,8 @@ export function ConfirmExitModal({ open, onSave, onDiscard, onCancel }) {
             <AlertCircle size={22} className="text-accent" />
           </div>
           <div>
-            <h3 className="text-[15px] font-bold text-primary">¿Cerrar proyecto actual?</h3>
-            <p className="text-[12px] text-muted">Aún tienes cambios sin guardar en "Mis proyectos".</p>
+            <h3 className="text-[15px] font-bold text-primary">{modalTitle}</h3>
+            <p className="text-[12px] text-muted">{modalDesc}</p>
           </div>
         </div>
 
