@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { CircleHelp, LogOut, Settings, UserRound } from 'lucide-react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { CircleHelp, LogOut, Moon, Settings, Sun, UserRound } from 'lucide-react'
 import { useAuthUser } from '../hooks/useAuthUser'
 import { supabase } from '../lib/supabase'
 
@@ -15,9 +15,16 @@ function getAvatarUrl(user) {
 
 export function UserProfileBadge() {
   const navigate = useNavigate()
+  const location = useLocation()
   const rootRef = useRef(null)
   const [open, setOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const [theme, setTheme] = useState(() => {
+    const stored = localStorage.getItem('xprin-theme')
+    if (stored === 'light' || stored === 'dark') return stored
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  })
+
   const { user, loading } = useAuthUser()
   const avatarUrl = getAvatarUrl(user)
   const email = user?.email || ''
@@ -30,6 +37,13 @@ export function UserProfileBadge() {
       || 'Usuario'
     )
   }, [user, email])
+
+  const dropdownPositionClass = useMemo(() => {
+    // En el editor, desplegar hacia la derecha; en proyectos, hacia la izquierda.
+    // Nota: `left-0` hace que el dropdown se expanda hacia la derecha; `right-0` hace que se expanda hacia la izquierda.
+    if (location.pathname.startsWith('/editor')) return 'left-0'
+    return 'right-0'
+  }, [location.pathname])
 
   useEffect(() => {
     if (!open) return
@@ -57,6 +71,29 @@ export function UserProfileBadge() {
       setSigningOut(false)
     }
   }
+
+  function handleThemeToggle() {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    localStorage.setItem('xprin-theme', next)
+    document.documentElement.classList.toggle('dark', next === 'dark')
+    setTheme(next)
+    // Notifica a otros componentes (ej. Header) del cambio de tema
+    window.dispatchEvent(new CustomEvent('xprin-theme-change', { detail: next }))
+    setOpen(false)
+  }
+
+  useEffect(() => {
+    // Mantener el tema sincronizado si se cambia fuera (otra pestaña)
+    const onStorage = (event) => {
+      if (event.key === 'xprin-theme' && (event.newValue === 'light' || event.newValue === 'dark')) {
+        setTheme(event.newValue)
+        document.documentElement.classList.toggle('dark', event.newValue === 'dark')
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
 
   if (loading) {
     return <div className="h-9 w-9 rounded-full border border-border-light bg-surface-elevated animate-pulse" />
@@ -99,7 +136,7 @@ export function UserProfileBadge() {
       </button>
 
       <div
-        className={`absolute right-0 top-[calc(100%+10px)] z-[180] w-[300px] max-w-[88vw] overflow-hidden rounded-2xl border border-red-500/25 bg-surface shadow-[0_20px_45px_rgba(0,0,0,0.28)] transition-all duration-200 ${
+        className={`absolute ${dropdownPositionClass} top-[calc(100%+10px)] z-[180] w-[300px] max-w-[88vw] overflow-hidden rounded-2xl border border-red-500/25 bg-surface shadow-[0_20px_45px_rgba(0,0,0,0.28)] transition-all duration-200 ${
           open ? 'pointer-events-auto translate-y-0 opacity-100 scale-100' : 'pointer-events-none -translate-y-1 opacity-0 scale-[0.98]'
         }`}
       >
@@ -127,6 +164,18 @@ export function UserProfileBadge() {
           >
             <UserRound size={16} />
             Mi cuenta
+          </button>
+          <button
+            type="button"
+            onClick={handleThemeToggle}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-secondary hover:bg-surface-elevated hover:text-primary transition-all duration-200 cursor-pointer"
+          >
+            {theme === 'dark' ? (
+              <Sun className="h-4 w-4 text-yellow-400 transition-transform duration-300" />
+            ) : (
+              <Moon className="h-4 w-4 text-blue-500 transition-transform duration-300" />
+            )}
+            Cambiar fondo
           </button>
           <button
             type="button"

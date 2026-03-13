@@ -10,9 +10,12 @@ import { ProjectsMenu }         from './pages/ProjectsMenu'
 import { Ayuda }                from './pages/Ayuda'
 import { MiCuenta }             from './pages/MiCuenta'
 import { Configuracion }        from './pages/Configuracion'
+import { PoliticaPrivacidad }   from './pages/PoliticaPrivacidad'
+import { AvisoLegal }           from './pages/AvisoLegal'
+import { PoliticaCookies }      from './pages/PoliticaCookies'
+import { PoliticaCalidad }      from './pages/PoliticaCalidad'
 import { RequireAuth }          from './components/RequireAuth'
 import { useStore } from './store'
-import { supabase } from './lib/supabase'
 
 export default function App() {
   const rehidratarStore = useStore((s) => s.rehidratarStore);
@@ -20,15 +23,6 @@ export default function App() {
   useEffect(() => {
     rehidratarStore();
   }, [rehidratarStore]);
-
-  useEffect(() => {
-    // Refrescar la sesión de Supabase al cargar la app para asegurar persistencia
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        console.log('Sesión recuperada:', session.user.email);
-      }
-    });
-  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -58,44 +52,25 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/"                      element={<Landing />}              />
-        <Route path="/login"                 element={<Login />}                />
-        <Route path="/registro"              element={<Registro />}             />
-        <Route path="/recuperar"             element={<RecuperarContrasena />}  />
-        <Route path="/actualizar-contrasena" element={<ActualizarContrasena />} />
-        <Route path="/proyectos"             element={<ProjectsMenu />}         />
-        <Route
-          path="/mi-cuenta"
-          element={(
-            <RequireAuth>
-              <MiCuenta />
-            </RequireAuth>
-          )}
-        />
-        <Route
-          path="/configuracion"
-          element={(
-            <RequireAuth>
-              <Configuracion />
-            </RequireAuth>
-          )}
-        />
-        <Route
-          path="/ayuda"
-          element={(
-            <RequireAuth>
-              <Ayuda />
-            </RequireAuth>
-          )}
-        />
-        <Route
-          path="/editor"
-          element={(
-            <RequireAuth>
-              <Editor />
-            </RequireAuth>
-          )}
-        />
+        {/* ── Públicas ────────────────────────────────────────────── */}
+        <Route path="/"                       element={<Landing />}             />
+        <Route path="/login"                  element={<Login />}               />
+        <Route path="/registro"               element={<Registro />}            />
+        <Route path="/recuperar"              element={<RecuperarContrasena />} />
+        <Route path="/actualizar-contrasena"  element={<ActualizarContrasena />}/>
+
+        {/* ── Protegidas ──────────────────────────────────────────── */}
+        <Route path="/proyectos" element={<RequireAuth><ProjectsMenu /></RequireAuth>} />
+        <Route path="/editor"    element={<RequireAuth><Editor /></RequireAuth>}       />
+        <Route path="/mi-cuenta" element={<RequireAuth><MiCuenta /></RequireAuth>}     />
+        <Route path="/configuracion" element={<RequireAuth><Configuracion /></RequireAuth>} />
+        <Route path="/ayuda"     element={<RequireAuth><Ayuda /></RequireAuth>}        />
+
+        {/* ── Legales ─────────────────────────────────────── */}
+        <Route path="/politica-de-privacidad" element={<PoliticaPrivacidad />} />
+        <Route path="/aviso-legal"            element={<AvisoLegal />}         />
+        <Route path="/politica-de-cookies"    element={<PoliticaCookies />}    />
+        <Route path="/politica-de-calidad"    element={<PoliticaCalidad />}    />
       </Routes>
     </BrowserRouter>
   )

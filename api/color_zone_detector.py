@@ -20,6 +20,7 @@ Uso CLI:
     python color_zone_detector.py imagen.png --sigma 2.0
     python color_zone_detector.py imagen.png --debug
 """
+""""""
 
 import cv2
 import numpy as np
