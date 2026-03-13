@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Landing }              from './pages/Landing'
 import { Login }                from './pages/Login'
@@ -9,6 +10,10 @@ import { ProjectsMenu }         from './pages/ProjectsMenu'
 import { Ayuda }                from './pages/Ayuda'
 import { MiCuenta }             from './pages/MiCuenta'
 import { Configuracion }        from './pages/Configuracion'
+import { PoliticaPrivacidad }   from './pages/PoliticaPrivacidad'
+import { AvisoLegal }           from './pages/AvisoLegal'
+import { PoliticaCookies }      from './pages/PoliticaCookies'
+import { PoliticaCalidad }      from './pages/PoliticaCalidad'
 import { RequireAuth }          from './components/RequireAuth'
 import { useStore } from './store'
 
@@ -61,7 +66,7 @@ export default function App() {
         <Route path="/configuracion" element={<RequireAuth><Configuracion /></RequireAuth>} />
         <Route path="/ayuda"     element={<RequireAuth><Ayuda /></RequireAuth>}        />
 
-        {/* ── Legales (Blanca) ─────────────────────────────────────── */}
+        {/* ── Legales ─────────────────────────────────────── */}
         <Route path="/politica-de-privacidad" element={<PoliticaPrivacidad />} />
         <Route path="/aviso-legal"            element={<AvisoLegal />}         />
         <Route path="/politica-de-cookies"    element={<PoliticaCookies />}    />
