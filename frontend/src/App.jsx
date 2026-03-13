@@ -7,6 +7,8 @@ import { RecuperarContrasena }  from './pages/RecuperarContrasena'
 import { ActualizarContrasena } from './pages/ActualizarContrasena'
 import { Editor }               from './pages/Editor'
 import { ProjectsMenu }         from './pages/ProjectsMenu'
+import { Ayuda }                from './pages/Ayuda'
+import { RequireAuth }          from './components/RequireAuth'
 import { useStore } from './store'
 
 export default function App() {
@@ -50,7 +52,22 @@ export default function App() {
         <Route path="/recuperar"             element={<RecuperarContrasena />}  />
         <Route path="/actualizar-contrasena" element={<ActualizarContrasena />} />
         <Route path="/proyectos"             element={<ProjectsMenu />}         />
-        <Route path="/editor"               element={<Editor />}               />
+        <Route
+          path="/ayuda"
+          element={(
+            <RequireAuth>
+              <Ayuda />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/editor"
+          element={(
+            <RequireAuth>
+              <Editor />
+            </RequireAuth>
+          )}
+        />
       </Routes>
     </BrowserRouter>
   )

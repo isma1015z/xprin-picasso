@@ -3,9 +3,10 @@
 
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, Sun, Moon, FileDown, ChevronDown, LogOut, Menu, X, Save } from 'lucide-react'
+import { Upload, FileDown, ChevronDown, LogOut, Menu, X, Save } from 'lucide-react'
 import { useStore } from '../store'
 import { DetectionSettings } from './DetectionSettings'
+import { UserProfileBadge } from './UserProfileBadge'
 import { getDetectedImageUrl } from '../detectedImageUrl'
 import { API_URL } from '../config'
 import { ConfirmExitModal } from './ConfirmExitModal'
@@ -14,7 +15,7 @@ import lapizBlanco from '../assets/images/lapizBlanco.png'
 import logo from '../assets/images/Logo_Negro.png'
 import logoBlanco from '../assets/images/Logo_Blanco.png'
 
-export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = false, toggleMobileMenu = () => { } }) {
+export function Header({ theme, isMobile = false, mobileMenuOpen = false, toggleMobileMenu = () => { } }) {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [exportMenu, setExportMenu] = useState(false)
@@ -180,6 +181,7 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
   return (
     <header className="relative flex items-center justify-between h-[60px] px-6 bg-surface border-b border-border-strong shadow-sm z-10 w-full shrink-0 max-md:px-3">
       <div className="flex items-center gap-4 min-w-0 flex-1">
+        <UserProfileBadge />
         <button
           onClick={() => {
             if (imagenUrl) setShowExitModal(true)
@@ -282,11 +284,6 @@ export function Header({ theme, toggleTheme, isMobile = false, mobileMenuOpen = 
             {spotCount}/{capas.length} spots
           </span>
         )}
-
-        <button onClick={toggleTheme} aria-label="Toggle theme"
-          className="flex items-center justify-center w-9 h-9 rounded-full text-secondary hover:bg-surface-elevated hover:text-primary transition-all duration-200 cursor-pointer">
-          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-        </button>
 
         {isMobile && (
           <button onClick={toggleMobileMenu}
